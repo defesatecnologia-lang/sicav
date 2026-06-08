@@ -1,0 +1,113 @@
+# Sistema de Visitantes v1.0
+
+Sistema web para controle de entrada e saída de visitantes com geração de crachás, relatórios e auditoria.
+
+## Funcionalidades
+
+- Cadastro de visitantes com foto via webcam
+- Geração de crachá personalizado (impressão)
+- Controle de entrada/saída com registro de data/hora
+- Relatórios por período com gráficos
+- Auditoria de todas as alterações
+- Níveis de acesso: admin, supervisor, user
+- Bloqueio automático após tentativas de login inválidas
+- Proteção CSRF e sanitização XSS
+- Sessões seguras com timeout configurável
+
+## Tecnologias
+
+- PHP 8.2
+- MySQL 8.0
+- Apache com mod_rewrite
+- JavaScript (Vanilla + Chart.js)
+- Bootstrap 5
+- Docker Compose
+
+## Requisitos
+
+- PHP 8.2+
+- MySQL 8.0+
+- Extensões PHP: PDO_MySQL, GD, ZIP, JSON
+- Apache com mod_rewrite
+
+## Instalação local
+
+```bash
+# Clone o repositório
+git clone https://github.com/GhostTerminals/sistema-visitantes-v1.0.git
+cd sistema-visitantes-v1.0
+
+# Configure o ambiente
+cp .env.example .env
+# Edite .env com suas credenciais do banco
+
+# Instale dependências
+composer install --no-dev
+
+# Importe o schema do banco
+mysql -u root -p < db/visitorpass.sql
+
+# Configure o VirtualHost para apontar para /public
+```
+
+## Deploy com Docker
+
+### Desenvolvimento
+
+```bash
+# Copie o arquivo de exemplo
+cp .env.example.docker .env
+
+# Inicie os containers
+docker compose up -d
+
+# Acesse:
+# - App: http://localhost:8080
+# - phpMyAdmin: http://localhost:8081
+```
+
+### Produção
+
+```bash
+# Configure variáveis seguras
+vim .env
+# Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD
+
+# Build e inicie
+docker compose up -d --build
+```
+
+## Usuários padrão (Docker)
+
+Os seguintes usuários são criados automaticamente na primeira execução:
+
+| Usuário | Senha | Nível |
+|---------|-------|-------|
+| admin | Admin@2026Temp! | admin |
+| supervisor | Supervisor@2026Temp! | supervisor |
+| user | User@2026Temp! | user |
+
+**Altere as senhas imediatamente após o primeiro login.**
+
+## Estrutura do projeto
+
+```
+sistema-visitantes-v1.0/
+├── api/              # Endpoints REST
+├── config/           # Configurações do app
+├── db/               # Scripts SQL
+├── docker/           # Configurações Docker
+├── fotos_visitantes/ # Uploads de fotos (volume Docker)
+├── inc/              # Helpers e includes
+├── public/           # DocumentRoot (index.php, assets)
+├── scripts/          # CRUD e controllers
+├── tests/            # Testes unitários
+├── vendor/           # Dependências Composer
+├── Dockerfile        # Build da imagem PHP
+├── docker-compose.yml
+└── .env.example
+```
+
+## Licença
+
+Uso interno.
