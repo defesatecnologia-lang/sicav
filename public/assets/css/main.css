@@ -1,0 +1,568 @@
+:root {
+  /* ====== CORES ====== */
+  --primary-color: #2c3e50;
+  --secondary-color: #34495e;
+  --accent-color: #3498db;
+  --success-color: #27ae60;
+  --warning-color: #f39c12;
+  --danger-color: #e74c3c;
+  --light-bg: #f8f9fa;
+}
+
+/* ====== REGRAS GERAIS ====== */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  color: #333;
+}
+
+/* ====== NAVBAR ====== */
+.navbar-brand {
+  font-weight: 600;
+}
+
+/* ====== CARDS ====== */
+.card {
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  margin-bottom: 1.5rem;
+  animation: fadeIn 0.6s ease;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  border-radius: 15px 15px 0 0;
+  font-weight: 600;
+  padding: 1rem 1.5rem;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+/* ====== BOTÕES ====== */
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  padding: 0.6rem 1.4rem;
+  font-size: 1rem;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+}
+
+.btn-primary {
+  background: var(--accent-color);
+  border: none;
+}
+
+.btn-success {
+  background: var(--success-color);
+  border: none;
+}
+
+.btn-warning {
+  background: var(--warning-color);
+  border: none;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ====== FORMULÁRIOS ====== */
+.form-control,
+.form-select {
+  border-radius: 8px;
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+  padding: 0.75rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+  transform: translateY(-2px);
+}
+
+/* ====== FORMULÁRIO DE SAÍDA ====== */
+.logout-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.logout-input-container {
+  width: 100%;
+}
+
+.logout-input-container .form-label {
+  font-weight: 600;
+  font-size: 1.1rem;
+  margin-bottom: 8px;
+  color: var(--primary-color);
+}
+
+/* Campo de texto (Visitante Ativo) */
+#vid {
+  height: 60px;
+  font-size: 18px;
+  padding: 15px 20px;
+  border: 2px solid #ced4da;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  width: 100%;
+  background-color: #fff;
+}
+
+#vid:focus {
+  border-color: #ffc107;
+  box-shadow: 0 0 0 0.3rem rgba(255, 193, 7, 0.25);
+  transform: translateY(-2px);
+  background-color: #fffaf0;
+}
+
+/* Botões do logout */
+.logout-buttons-container {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.logout-buttons-container .btn {
+  padding: 12px 30px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.logout-buttons-container .btn-warning {
+  background: linear-gradient(135deg, #ffc107, #e0a800);
+  border: none;
+  color: #212529;
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+  border: 2px solid #ffc107;
+}
+
+.logout-buttons-container .btn-warning:hover {
+  background: linear-gradient(135deg, #e0a800, #d39e00);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+}
+
+.logout-buttons-container .btn-outline-secondary {
+  border: 2px solid #6c757d;
+  color: #6c757d;
+  background: transparent;
+  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.3);
+}
+
+.logout-buttons-container .btn-outline-secondary:hover {
+  background-color: #6c757d;
+  color: white;
+  transform: translateY(-2px);
+}
+
+footer .footer-logo {
+  height: 56px !important;
+  max-height: 56px !important;
+  width: auto !important;
+  display: inline-block;
+  vertical-align: middle;
+  opacity: 0.9;
+}
+
+footer .footer-logo:hover {
+  opacity: 1;
+}
+
+/* Texto de ajuda */
+.logout-input-container .form-text {
+  font-size: 14px;
+  margin-top: 8px;
+  color: #6c757d;
+  font-style: italic;
+}
+
+/* ====== WEBCAM ====== */
+.webcam-container {
+  position: relative;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#webcamVideo {
+  width: 100%;
+  height: 300px;
+  object-fit: cover;
+}
+
+#photoPreview img {
+  border-radius: 10px;
+  border: 3px solid var(--success-color);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* ====== BADGES ====== */
+.badge-template {
+  background: linear-gradient(135deg, #ffffff 0%, var(--light-bg) 100%);
+  border: 3px solid var(--primary-color);
+  border-radius: 15px;
+  padding: 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.badge-template::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--success-color), var(--accent-color));
+}
+
+.badge-template h4 {
+  color: var(--primary-color);
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+}
+
+.badge-template img {
+  border: 4px solid var(--accent-color);
+  border-radius: 50%;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.badge-info {
+  text-align: left;
+  background: var(--light-bg);
+  padding: 1rem;
+  border-radius: 8px;
+  border-left: 4px solid var(--success-color);
+}
+
+.badge-info p {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.badge-info strong {
+  color: var(--primary-color);
+}
+
+/* ====== ALERTAS / NOTIFICAÇÕES ====== */
+.alert {
+  border-radius: 10px;
+  border: none;
+  padding: 1rem 1.5rem;
+  font-weight: 500;
+}
+
+.alert-success {
+  background: linear-gradient(135deg, #d4edda, #c3e6cb);
+  color: #155724;
+}
+
+.alert-danger {
+  background: linear-gradient(135deg, #f8d7da, #f1b0b7);
+  color: #721c24;
+}
+
+.alert-warning {
+  background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+  color: #856404;
+}
+
+.alert-info {
+  background: linear-gradient(135deg, #d1ecf1, #b6effb);
+  color: #0c5460;
+}
+
+/* ====== NOTIFICAÇÕES CENTRALIZADAS ====== */
+.notification-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 99999;
+}
+
+.notification {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 300px;
+  max-width: 90vw;
+  padding: 12px 24px;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  opacity: 0;
+  transform: translateY(-15px);
+  transition: all 0.3s ease;
+  animation: fadeDown 0.4s ease forwards;
+}
+
+.notification.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.notification.success::before {
+  content: "✅";
+  font-size: 1.2em;
+}
+
+.notification.error::before {
+  content: "❌";
+  font-size: 1.2em;
+}
+
+.notification.warning::before {
+  content: "⚠️";
+  font-size: 1.2em;
+}
+
+.notification.info::before {
+  content: "ℹ️";
+  font-size: 1.2em;
+}
+
+.notification.success {
+  background-color: var(--success-color);
+}
+
+.notification.error {
+  background-color: var(--danger-color);
+}
+
+.notification.warning {
+  background-color: var(--warning-color);
+  color: #222;
+}
+
+.notification.info {
+  background-color: var(--accent-color);
+}
+
+/* ====== LOADING ====== */
+.loading {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* ====== ANIMAÇÕES ====== */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ====== RESPONSIVIDADE ====== */
+@media (max-width: 768px) {
+  .container-fluid {
+    padding: 0.5rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+
+  .btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .webcam-container {
+    margin-bottom: 1rem;
+  }
+
+  .alert.position-fixed {
+    left: 10px !important;
+    right: 10px !important;
+    min-width: auto !important;
+    max-width: none !important;
+  }
+
+  #vid {
+    height: 50px;
+    font-size: 16px;
+    padding: 12px 15px;
+  }
+
+  .logout-buttons-container {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .logout-buttons-container .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ====== PRINT ====== */
+@media print {
+  body:has(.badge-template) *:not(.badge-template):not(.badge-template *) {
+    visibility: hidden;
+  }
+  .badge-template,
+  .badge-template * {
+    visibility: visible;
+  }
+  .badge-template {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none;
+    border: 2px solid var(--accent-color);
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+  }
+  .badge-header {
+    background: var(--accent-color);
+    color: white;
+    padding: 10px;
+    margin: -15px -15px 15px -15px;
+    border-radius: 8px 8px 0 0;
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1; /* ocupa o espaço restante */
+}
+.developer-name {
+  font-weight: bold;
+  font-family: "Segoe Script", "Brush Script MT", cursive;
+  color: #000000; /* Azul estilizado, você pode trocar */
+  font-size: 0.95rem;
+}
+
+/* Utilitarios para substituir style inline (CSP) */
+.u-object-cover-50 {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+}
+
+.u-avatar-placeholder-50 {
+  width: 50px;
+  height: 50px;
+}
+
+.u-cracha-photo {
+  max-height: 120px;
+  border: 2px solid #dee2e6;
+}
+
+.u-cracha-photo-placeholder {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+  border: 2px solid #dee2e6;
+}
+
+.u-cracha-name {
+  font-size: 1.1em;
+}
+
+.u-detalhe-foto {
+  max-height: 200px;
+}
+
+.u-detalhe-foto-placeholder {
+  height: 200px;
+}
+
+.u-admin-logo-side {
+  max-height: 450px;
+}
+
+.u-zindex-9999 {
+  z-index: 9999;
+}
+
+.u-scroll-max-400 {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.u-photo-preview-150 {
+  max-height: 150px;
+}

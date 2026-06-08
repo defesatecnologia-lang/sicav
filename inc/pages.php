@@ -1,0 +1,38 @@
+<?php
+return [
+    '404',
+    'home',
+    'login', 
+    'login_submit',
+    'logout',
+    'nao_autorizado',
+    'administracao',
+    'cadastroUsuario',
+    'listarUsuario',
+    'editarUsuario',
+    'bloquearUsuario', 
+    'ativarUsuario',
+    'deletarUsuario',
+    'trocar_senha',
+    'admin_auditoria',
+    'admin_login_locks',
+    'desbloquear_login',
+    // 🔥 PÁGINAS DO SISTEMA DE VISITANTES
+    'cadastro_visitantes',
+    'listar_visitantes',
+    'relatorios_visitantes',
+    // 🔥 ENDPOINTS PARA AJAX (agora na pasta api/)
+    'api/get_active_visitors',
+    'api/signout',
+    'api/api_relatorios',
+    'api/api_estatisticas',
+    'api/api_detalhes',
+    'api/api_cadastro_visitante',
+    'api/api_export',
+    'api/reactivate_visitor',
+    'api/exportar_auditoria',
+    'api/get_auditoria_detalhe',
+    'api/get_auditoria',
+    'api/session_check',
+    'api/renovar_sessao'
+];

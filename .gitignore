@@ -1,0 +1,34 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Dependencies
+vendor/
+node_modules/
+
+# Uploaded files
+/fotos_visitantes/*
+
+# Database backups
+/db/*.sql
+/db/*.backup
+/db/*.sh
+
+# Config
+/config/database.local.php
