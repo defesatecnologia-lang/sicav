@@ -1,0 +1,75 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ENVIRONMENT: ${APP_ENV:-production}
+    container_name: visitantes-app
+    ports:
+      - "${APP_PORT:-8080}:80"
+    environment:
+      VISITORPASS_DB_HOST: db
+      VISITORPASS_DB_PORT: 3306
+      VISITORPASS_DB_NAME: ${VISITORPASS_DB_NAME:-visitorpass}
+      VISITORPASS_DB_USER: ${VISITORPASS_DB_USER:-vpuser}
+      VISITORPASS_DB_PASS: ${VISITORPASS_DB_PASS:-visitorpassword}
+      VISITORPASS_SESSION_TIMEOUT: ${VISITORPASS_SESSION_TIMEOUT:-3600}
+      VISITORPASS_APP_NAME: "Sistema de Visitantes"
+      VISITORPASS_ENV: ${APP_ENV:-production}
+    volumes:
+      - fotos_visitantes:/var/www/html/fotos_visitantes
+      - ./public/imagens:/var/www/html/public/imagens:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - visitantes-net
+
+  db:
+    image: mysql:8.0
+    container_name: visitantes-db
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${VISITORPASS_DB_NAME:-visitorpass}
+      MYSQL_USER: ${VISITORPASS_DB_USER:-vpuser}
+      MYSQL_PASSWORD: ${VISITORPASS_DB_PASS:-visitorpassword}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - visitantes-net
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: visitantes-pma
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 50M
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - visitantes-net
+
+volumes:
+  mysql_data:
+    driver: local
+  fotos_visitantes:
+    driver: local
+
+networks:
+  visitantes-net:
+    driver: bridge
