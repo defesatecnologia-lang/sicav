@@ -6,10 +6,14 @@ if [ ! -f /var/www/html/.env ] && [ -f /var/www/html/.env.example ]; then
     cp /var/www/html/.env.example /var/www/html/.env
 fi
 
+# Source .env only for variables not already set (docker-compose env vars take precedence)
 if [ -f /var/www/html/.env ]; then
-    set -a
-    source /var/www/html/.env
-    set +a
+    while IFS='=' read -r key val || [ -n "$key" ]; do
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        if [ -z "${!key+x}" ]; then
+            export "$key=$val"
+        fi
+    done < /var/www/html/.env
 fi
 
 echo "--> Setting permissions..."
