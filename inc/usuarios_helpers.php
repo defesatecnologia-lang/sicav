@@ -19,7 +19,7 @@ function listarUsuarios(database $dbConn): array
 {
     try {
         $sql = "SELECT id, nome, usuario, nivel_acesso, ativo, data FROM usuarios ORDER BY id DESC";
-        $result = $dbConn->query($sql);
+        $result = $dbConn->select($sql);
         return $result['status'] === 'success' ? $result['data'] : [];
     } catch (Exception $e) {
         error_log('Erro ao buscar usuarios: ' . $e->getMessage());
@@ -38,7 +38,7 @@ function listarUsuariosComSenhaTemporaria(database $dbConn): array
 {
     try {
         $sql = "SELECT id, nome, usuario, nivel_acesso, data, senha_temporaria FROM usuarios ORDER BY id DESC";
-        $result = $dbConn->query($sql);
+        $result = $dbConn->select($sql);
 
         if ($result['status'] === 'success') {
             return $result['data'];
@@ -62,7 +62,7 @@ function usuarioExiste(database $dbConn, string $usuario): bool
     try {
         $sql = "SELECT COUNT(*) AS total FROM usuarios WHERE usuario = :usuario";
         $params = [':usuario' => $usuario];
-        $result = $dbConn->query($sql, $params);
+        $result = $dbConn->select($sql, $params);
 
         if ($result['status'] === 'success' && count($result['data']) > 0) {
             return $result['data'][0]->total >= 1;
@@ -86,7 +86,7 @@ function nomeExiste(database $dbConn, string $nome): bool
     try {
         $sql = "SELECT COUNT(*) AS total FROM usuarios WHERE nome = :nome";
         $params = [':nome' => $nome];
-        $result = $dbConn->query($sql, $params);
+        $result = $dbConn->select($sql, $params);
 
         if ($result['status'] === 'success' && count($result['data']) > 0) {
             return $result['data'][0]->total >= 1;

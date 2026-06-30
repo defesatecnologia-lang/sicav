@@ -6,7 +6,7 @@
 node_modules
 vendor
 fotos_visitantes/*
-docker/
+# docker/ removido pois o Dockerfile precisa desses arquivos
 *.md
 .gitkeep
 Thumbs.db

@@ -1,6 +1,5 @@
 <?php
 require_once __DIR__ . '/../inc/navbar.php';
-requererAcesso('admin'); // ⭐⭐ MANTÉM APENAS ADMIN ⭐⭐
 ?>
 
 <section class="bg-body-tertiary min-vh-100 d-flex align-items-center">

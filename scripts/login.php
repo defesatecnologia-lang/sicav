@@ -57,7 +57,7 @@ body {
     justify-content: center;
     align-items: center;
 
-    background: url('<?= htmlspecialchars($GLOBALS['APP_BASE_PATH'] ?? '', ENT_QUOTES, 'UTF-8') ?>/imagens/tela_fundo.png');
+    background: #1a2a4a url('<?= htmlspecialchars($GLOBALS['APP_BASE_PATH'] ?? '', ENT_QUOTES, 'UTF-8') ?>/imagens/tela_fundo.png');
 
     background-size: 50% auto;
     background-position: center;
@@ -81,12 +81,12 @@ body {
 
 /* Glassmorphism real */
 .card {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
 
     border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.5);
 
     box-shadow: 0 15px 35px rgba(0, 0, 0, 0.35);
     color: #000;

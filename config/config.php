@@ -37,3 +37,7 @@ if (!defined('DB_PASS')) {
     }
     define('DB_PASS', $pass);
 }
+
+if (!defined('GLOBAL_IP_SCOPE')) {
+    define('GLOBAL_IP_SCOPE', '__IP_GLOBAL__');
+}

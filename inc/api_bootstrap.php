@@ -3,6 +3,8 @@
 require_once __DIR__ . '/security.php';
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/single_session.php';
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/helpers.php';
 
 function logApiException(Throwable $e, array $context = []): void
 {
@@ -56,6 +58,14 @@ function apiGetJsonInput(): array
 
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : [];
+}
+
+function apiRequireEndpointAccess(): void
+{
+    $map = require __DIR__ . '/../config/permissions.php';
+    $endpoint = basename($_SERVER['SCRIPT_NAME'], '.php');
+    $requiredAccess = $map[$endpoint] ?? 'user';
+    apiRequireAuth($requiredAccess);
 }
 
 function apiRequireAuth(string $requiredAccess = 'user'): void

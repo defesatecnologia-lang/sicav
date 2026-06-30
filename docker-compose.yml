@@ -30,6 +30,7 @@ services:
   db:
     image: mysql:8.0
     container_name: visitantes-db
+    command: --log-bin-trust-function-creators=1
     ports:
       - "${DB_PORT:-3307}:3306"
     environment:

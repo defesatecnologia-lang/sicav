@@ -1,24 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('admin');
-
-function sanitizeSpreadsheetCell($value): string
-{
-    $text = trim((string) ($value ?? ''));
-    if ($text === '') {
-        return '';
-    }
-
-    $first = substr($text, 0, 1);
-    if (in_array($first, ['=', '+', '-', '@'], true)) {
-        return "'" . $text;
-    }
-
-    return $text;
-}
+apiRequireEndpointAccess();
 
 $formato = $_GET['formato'] ?? 'csv';
 $dataInicio = $_GET['data_inicio'] ?? date('Y-m-d', strtotime('-30 days'));
@@ -32,10 +16,10 @@ try {
         FROM auditoria_visitantes a
         LEFT JOIN visitorinfo v ON a.registro_id = v.id
         LEFT JOIN usuarios u ON a.usuario_id = u.id
-        WHERE DATE(a.data_acao) BETWEEN ? AND ?
+        WHERE DATE(a.data_acao) BETWEEN :data_inicio AND :data_fim
         ORDER BY a.data_acao DESC
     ";
-    $result = $db->query($sql, [$dataInicio, $dataFim]);
+    $result = $db->select($sql, [':data_inicio' => $dataInicio, ':data_fim' => $dataFim]);
     $rows = ($result['status'] === 'success') ? $result['data'] : [];
 
     if ($formato === 'json') {

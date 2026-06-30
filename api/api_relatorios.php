@@ -1,9 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('supervisor');
+apiRequireEndpointAccess();
 
 try {
     $db = new database();
@@ -13,7 +12,7 @@ try {
     if (!empty($_GET['data_inicial'])) {
         $dataInicial = DateTime::createFromFormat('d/m/Y', trim($_GET['data_inicial']));
         if ($dataInicial) {
-            $horaInicial = !empty($_GET['hora_inicial']) ? $_GET['hora_inicial'] . ':00' : '00:00:00';
+            $horaInicial = !empty($_GET['hora_inicial']) && preg_match('/^\d{2}:\d{2}$/', $_GET['hora_inicial']) ? $_GET['hora_inicial'] . ':00' : '00:00:00';
             $query .= " AND data_entrada >= :data_inicial";
             $params[':data_inicial'] = $dataInicial->format('Y-m-d') . ' ' . $horaInicial;
         }
@@ -22,7 +21,7 @@ try {
     if (!empty($_GET['data_final'])) {
         $dataFinal = DateTime::createFromFormat('d/m/Y', trim($_GET['data_final']));
         if ($dataFinal) {
-            $horaFinal = !empty($_GET['hora_final']) ? $_GET['hora_final'] . ':00' : '23:59:59';
+            $horaFinal = !empty($_GET['hora_final']) && preg_match('/^\d{2}:\d{2}$/', $_GET['hora_final']) ? $_GET['hora_final'] . ':00' : '23:59:59';
             $query .= " AND data_entrada <= :data_final";
             $params[':data_final'] = $dataFinal->format('Y-m-d') . ' ' . $horaFinal;
         }
@@ -51,7 +50,7 @@ try {
     }
 
     $query .= " ORDER BY data_entrada DESC";
-    $result = $db->query($query, $params);
+    $result = $db->select($query, $params);
     if ($result['success'] !== true) {
         throw new Exception('Erro ao consultar dados');
     }

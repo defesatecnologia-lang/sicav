@@ -1,9 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('admin');
+apiRequireEndpointAccess();
 
 try {
     $db = new database();
@@ -21,7 +20,7 @@ try {
     }
 
     $sql .= " ORDER BY a.data_acao DESC LIMIT 100";
-    $result = $db->query($sql, $params);
+    $result = $db->select($sql, $params);
     if ($result['success'] !== true) {
         apiJsonResponse([], 200);
     }

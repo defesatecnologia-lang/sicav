@@ -56,7 +56,7 @@ $current_page = $_GET['page'] ?? 'home';
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                         <i class="fas fa-user-circle me-1"></i>
                         <strong><?= htmlspecialchars($_SESSION['usuario']->usuario ?? '') ?></strong>
-                        <?php if (isset($_SESSION['usuario']->senha_temporaria) && $_SESSION['usuario']->senha_temporaria == 1): ?>
+                        <?php if (isset($_SESSION['usuario']->senha_temporaria) && (int)$_SESSION['usuario']->senha_temporaria === 1): ?>
                         <span class="badge bg-warning ms-1">Trocar Senha</span>
                         <?php endif; ?>
                     </a>
@@ -79,7 +79,7 @@ $current_page = $_GET['page'] ?? 'home';
                         <li>
                             <hr class="dropdown-divider">
                         </li>
-                        <?php if (isset($_SESSION['usuario']->senha_temporaria) && $_SESSION['usuario']->senha_temporaria == 1): ?>
+                        <?php if (isset($_SESSION['usuario']->senha_temporaria) && (int)$_SESSION['usuario']->senha_temporaria === 1): ?>
                         <li>
                             <a class="dropdown-item text-warning" href="?page=trocar_senha">
                                 <i class="fas fa-exclamation-triangle me-1"></i>Trocar Senha
@@ -107,7 +107,7 @@ $current_page = $_GET['page'] ?? 'home';
 </nav>
 
 <!-- ⭐⭐ CORREÇÃO: Verificação segura de senha_temporaria ⭐⭐ -->
-<?php if (isset($_SESSION['usuario']) && isset($_SESSION['usuario']->senha_temporaria) && $_SESSION['usuario']->senha_temporaria == 1): ?>
+<?php if (isset($_SESSION['usuario']) && isset($_SESSION['usuario']->senha_temporaria) && (int)$_SESSION['usuario']->senha_temporaria === 1): ?>
 <div class="alert alert-warning alert-dismissible fade show mb-0 text-center" role="alert">
     <i class="fas fa-exclamation-triangle me-2"></i>
     <strong>Alerta de Segurança:</strong> Você está usando uma senha temporária.

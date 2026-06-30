@@ -1,4 +1,9 @@
 ﻿<?php
+
+use App\Router;
+use App\Middleware\AuthMiddleware;
+use App\Middleware\CsrfMiddleware;
+
 require_once __DIR__ . '/../config/app.php';
 configureSessionSecurity();
 if (session_status() === PHP_SESSION_NONE) {
@@ -6,14 +11,12 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../inc/security.php';
 require_once __DIR__ . '/../inc/single_session.php';
+require_once __DIR__ . '/../config/database.php';
 header('Content-Type: text/html; charset=UTF-8');
 
-$tempo_maximo = SESSION_TIMEOUT; // tempo limite de inatividade em segundos
+$tempo_maximo = SESSION_TIMEOUT;
 $page = $_GET['page'] ?? 'home';
 
-// Base publica real da aplicacao:
-// - DocumentRoot em /public  -> ""
-// - App servida em /projeto/public -> "/projeto/public"
 $publicBasePath = rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 if ($publicBasePath === '/') {
     $publicBasePath = '';
@@ -21,7 +24,6 @@ if ($publicBasePath === '/') {
 $GLOBALS['APP_BASE_PATH'] = $publicBasePath;
 $GLOBALS['APP_PUBLIC_PATH'] = $publicBasePath;
 
-// CSP centralizada: em produção evita unsafe-eval; em dev mantém compatibilidade.
 $isProduction = defined('ENVIRONMENT') && ENVIRONMENT === 'production';
 $scriptEvalPolicy = $isProduction ? "" : " 'unsafe-eval'";
 $cspNonce = rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=');
@@ -29,8 +31,9 @@ $GLOBALS['CSP_NONCE'] = $cspNonce;
 
 $cspPolicy = "default-src 'self'; "
     . "script-src 'self' 'nonce-{$cspNonce}'{$scriptEvalPolicy} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; "
-    . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
-    . "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
+    . "style-src 'self' 'nonce-{$cspNonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
+    . "style-src-elem 'self' 'nonce-{$cspNonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
+    . "style-src-attr 'unsafe-inline'; "
     . "img-src 'self' data: blob:; "
     . "font-src 'self' data: https://cdnjs.cloudflare.com; "
     . "connect-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; "
@@ -44,7 +47,6 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(self), microphone=(), geolocation=()');
 header('X-Frame-Options: SAMEORIGIN');
 
-// Detectar se e requisicao de API
 $isApi = str_starts_with($page, 'api/');
 
 function verificarTimeout($isApi = false, $tempo_maximo = SESSION_TIMEOUT)
@@ -61,7 +63,6 @@ function verificarTimeout($isApi = false, $tempo_maximo = SESSION_TIMEOUT)
     $inatividade = time() - $_SESSION['ultimo_acesso'];
     $time_left = $tempo_maximo - $inatividade;
 
-    // Usar >= para expirar exatamente no limite
     if ($inatividade >= $tempo_maximo) {
         $usuarioId = currentUserId();
         $sessionToken = $_SESSION['session_token'] ?? null;
@@ -74,7 +75,6 @@ function verificarTimeout($isApi = false, $tempo_maximo = SESSION_TIMEOUT)
             }
         }
 
-        // Limpar sessao completamente
         clearLocalSessionState();
 
         if ($isApi) {
@@ -157,121 +157,115 @@ function enforceUniqueSession(bool $isApi = false): void
     exit;
 }
 
-// Processar logout antes do timeout para sempre encerrar explicitamente
 if ($page === 'logout') {
     require_once __DIR__ . '/../scripts/logout.php';
     exit;
 }
 
-// Verificar timeout uma unica vez (antes de qualquer outra logica)
 $time_left = verificarTimeout($isApi, $tempo_maximo);
 enforceUniqueSession($isApi);
 getCsrfToken();
 
 require_once __DIR__ . '/../config/config.php';
-$pages_permitidas = require_once __DIR__ . '/../inc/pages.php';
-require_once __DIR__ . '/../inc/check_access.php';
 
-// Se nao estiver logado e nao for pagina de login_submit ou API, redireciona para login
-if (!isset($_SESSION['usuario']) && $page !== 'login_submit' && !str_starts_with($page, 'api/')) {
-    $page = 'login';
-}
+$router = new Router();
+$router->addGlobalMiddleware(new CsrfMiddleware());
 
-// Se esta logado e tenta acessar login, vai para home
-if (isset($_SESSION['usuario']) && $page === 'login') {
-    $page = 'home';
-}
+// Rotas publicas (sem auth)
+$router->any('login', function () {
+    require_once __DIR__ . '/../inc/header.php';
+    require_once __DIR__ . '/../scripts/login.php';
+    $GLOBALS['time_left'] = 0;
+    $GLOBALS['tempo_maximo'] = SESSION_TIMEOUT;
+    require_once __DIR__ . '/../inc/footer.php';
+});
 
-// Verifica se a pagina existe
-if (!in_array($page, $pages_permitidas, true)) {
-    $page = '404';
-}
-
-// Processamento de API
-if (str_starts_with($page, 'api/')) {
-    if (!isset($_SESSION['usuario'])) {
-        http_response_code(401);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['success' => false, 'message' => 'Sessao nao encontrada']);
-        exit;
-    }
-
-    $api_file = str_replace('api/', '', $page);
-    $script_path = __DIR__ . '/../api/' . $api_file . '.php';
-
-    if (!file_exists($script_path)) {
-        http_response_code(404);
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['error' => 'API endpoint not found: ' . $api_file]);
-        exit;
-    }
-
-    require_once $script_path;
+$router->any('login_submit', function () {
+    require_once __DIR__ . '/../scripts/login_submit.php';
     exit;
-}
+});
 
-// Definir script a ser carregado
-$script = null;
-switch ($page) {
-    case '404':
-        $script = '404.php';
-        break;
-    case 'login':
-        $script = 'login.php';
-        break;
-    case 'login_submit':
-        $script = 'login_submit.php';
-        break;
-    case 'home':
-        $script = 'home.php';
-        break;
-    case 'trocar_senha':
-        $script = 'trocar_senha.php';
-        break;
-    case 'cadastro_visitantes':
-        requererAcesso('user');
-        $script = 'cadastro_visitantes.php';
-        break;
-    case 'listar_visitantes':
-        requererAcesso('user');
-        $script = 'listar_visitantes.php';
-        break;
-    case 'relatorios_visitantes':
-        requererAcesso('supervisor');
-        $script = 'relatorios_visitantes.php';
-        break;
-    case 'nao_autorizado':
-        $script = 'nao_autorizado.php';
-        break;
-    case 'administracao':
-    case 'cadastroUsuario':
-    case 'listarUsuario':
-    case 'editarUsuario':
-    case 'deletarUsuario':
-    case 'bloquearUsuario':
-    case 'ativarUsuario':
-    case 'admin_auditoria':
-    case 'admin_login_locks':
-    case 'desbloquear_login':
-        requererAcesso('admin');
-        $script = $page . '.php';
-        break;
-    default:
-        $script = '404.php';
-}
-
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../inc/header.php';
-
-if (file_exists(__DIR__ . '/../scripts/' . $script)) {
-    require_once __DIR__ . '/../scripts/' . $script;
-} else {
+$router->any('404', function () {
+    require_once __DIR__ . '/../inc/header.php';
     require_once __DIR__ . '/../scripts/404.php';
+    $GLOBALS['time_left'] = 0;
+    $GLOBALS['tempo_maximo'] = SESSION_TIMEOUT;
+    require_once __DIR__ . '/../inc/footer.php';
+});
+
+$router->any('nao_autorizado', function () {
+    require_once __DIR__ . '/../inc/header.php';
+    require_once __DIR__ . '/../scripts/nao_autorizado.php';
+    $GLOBALS['time_left'] = 0;
+    $GLOBALS['tempo_maximo'] = SESSION_TIMEOUT;
+    require_once __DIR__ . '/../inc/footer.php';
+});
+
+// Rotas com auth user
+$userRoutes = ['home', 'trocar_senha', 'cadastro_visitantes', 'listar_visitantes'];
+foreach ($userRoutes as $route) {
+    $router->any($route, function () use ($route) {
+        require_once __DIR__ . '/../inc/header.php';
+        require_once __DIR__ . '/../scripts/' . $route . '.php';
+        $GLOBALS['time_left'] = $GLOBALS['time_left'] ?? 0;
+        $GLOBALS['tempo_maximo'] = SESSION_TIMEOUT;
+        require_once __DIR__ . '/../inc/footer.php';
+    }, [new AuthMiddleware('user')]);
 }
 
-// Passar variaveis para o footer
-$GLOBALS['time_left'] = $time_left;
-$GLOBALS['tempo_maximo'] = $tempo_maximo;
+// Rota relatorios (supervisor)
+$router->any('relatorios_visitantes', function () {
+    require_once __DIR__ . '/../inc/header.php';
+    require_once __DIR__ . '/../scripts/relatorios_visitantes.php';
+    $GLOBALS['time_left'] = $GLOBALS['time_left'] ?? 0;
+    $GLOBALS['tempo_maximo'] = SESSION_TIMEOUT;
+    require_once __DIR__ . '/../inc/footer.php';
+}, [new AuthMiddleware('supervisor')]);
 
-require_once __DIR__ . '/../inc/footer.php';
+// Rotas admin
+$adminRoutes = ['administracao', 'cadastroUsuario', 'listarUsuario', 'editarUsuario',
+    'deletarUsuario', 'bloquearUsuario', 'ativarUsuario', 'admin_auditoria',
+    'admin_login_locks', 'desbloquear_login'];
+foreach ($adminRoutes as $route) {
+    $router->any($route, function () use ($route) {
+        require_once __DIR__ . '/../inc/header.php';
+        require_once __DIR__ . '/../scripts/' . $route . '.php';
+        $GLOBALS['time_left'] = $GLOBALS['time_left'] ?? 0;
+        $GLOBALS['tempo_maximo'] = SESSION_TIMEOUT;
+        require_once __DIR__ . '/../inc/footer.php';
+    }, [new AuthMiddleware('admin')]);
+}
 
+// Rotas de API
+$apiRoutes = ['api_cadastro_visitante', 'api_detalhes', 'api_estatisticas',
+    'api_export', 'api_relatorios', 'exportar_auditoria', 'get_active_visitors',
+    'get_auditoria', 'get_auditoria_detalhe', 'get_photo', 'reactivate_visitor',
+    'renovar_sessao', 'session_check', 'signout'];
+
+foreach ($apiRoutes as $apiRoute) {
+    $router->any('api/' . $apiRoute, function () use ($apiRoute) {
+        $path = __DIR__ . '/../api/' . $apiRoute . '.php';
+        if (!file_exists($path)) {
+            http_response_code(404);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'API endpoint not found']);
+            exit;
+        }
+        require_once $path;
+        exit;
+    }, [new AuthMiddleware('user')]);
+}
+
+// Body class para background
+$bodyBgZoom = ['home', 'listar_visitantes'];
+$bodyBgShadow = ['cadastro_visitantes', 'listarUsuario', 'editarUsuario'];
+if (in_array($page, $bodyBgZoom, true)) {
+    $GLOBALS['body_class'] = 'page-bg';
+} elseif (in_array($page, $bodyBgShadow, true)) {
+    $GLOBALS['body_class'] = 'page-bg--shadow';
+} else {
+    $GLOBALS['body_class'] = '';
+}
+
+// Executar roteador
+$router->dispatch();

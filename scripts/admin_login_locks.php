@@ -2,13 +2,6 @@
 require_once __DIR__ . '/../inc/navbar.php';
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario']->nivel_acesso !== 'admin') {
-    header('Location: index.php?page=nao_autorizado');
-    exit;
-}
-
-const GLOBAL_IP_SCOPE = '__IP_GLOBAL__';
-
 $db = new database();
 
 $sql = "SELECT usuario, ip_address, attempt_count, lock_until, updated_at
@@ -16,7 +9,7 @@ $sql = "SELECT usuario, ip_address, attempt_count, lock_until, updated_at
         ORDER BY
             CASE WHEN lock_until IS NOT NULL AND lock_until > NOW() THEN 0 ELSE 1 END,
             updated_at DESC";
-$result = $db->query($sql);
+$result = $db->select($sql);
 $locks = ($result['status'] ?? '') === 'success' ? $result['data'] : [];
 ?>
 

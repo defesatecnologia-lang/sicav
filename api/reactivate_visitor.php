@@ -1,8 +1,7 @@
 <?php
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('user');
+apiRequireEndpointAccess();
 
 try {
     $db = new database();
@@ -46,7 +45,7 @@ try {
     }
 
     $sql .= " ORDER BY v1.data_entrada DESC";
-    $result = $db->query($sql, $params);
+    $result = $db->select($sql, $params);
 
     if ($result['success'] !== true) {
         apiError('Erro ao buscar cadastros inativos', 500);

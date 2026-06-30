@@ -7,18 +7,11 @@ require_once __DIR__ . '/../inc/single_session.php';
 const MAX_LOGIN_ATTEMPTS = 5;
 const MAX_IP_LOGIN_ATTEMPTS = 15;
 const LOGIN_LOCK_SECONDS = 900; // 15 minutos
-const GLOBAL_IP_SCOPE = '__IP_GLOBAL__';
-
 function setLoginErrorAndRedirect(string $mensagem): void
 {
     $_SESSION['error'] = $mensagem;
     header('Location: index.php?page=login');
     exit;
-}
-
-function getClientIp(): string
-{
-    return trim($_SERVER['REMOTE_ADDR'] ?? 'unknown');
 }
 
 function getLoginAttempt(database $db, string $usuario, string $ip): array
@@ -27,7 +20,7 @@ function getLoginAttempt(database $db, string $usuario, string $ip): array
             FROM login_attempts
             WHERE usuario = :usuario AND ip_address = :ip
             LIMIT 1";
-    $result = $db->query($sql, [':usuario' => $usuario, ':ip' => $ip]);
+    $result = $db->select($sql, [':usuario' => $usuario, ':ip' => $ip]);
 
     if (($result['status'] ?? '') !== 'success' || empty($result['data'])) {
         return ['attempt_count' => 0, 'lock_until_ts' => 0];
@@ -59,7 +52,7 @@ function registerLoginFailure(database $db, string $usuario, string $ip, int $cu
                 lock_until = VALUES(lock_until),
                 updated_at = CURRENT_TIMESTAMP";
 
-    $db->query($sql, [
+    $db->insert($sql, [
         ':usuario' => $usuario,
         ':ip' => $ip,
         ':attempt_count' => $newCount,
@@ -72,7 +65,7 @@ function registerLoginFailure(database $db, string $usuario, string $ip, int $cu
 function clearLoginAttempts(database $db, string $usuario, string $ip): void
 {
     $sql = "DELETE FROM login_attempts WHERE usuario = :usuario AND ip_address = :ip";
-    $db->query($sql, [':usuario' => $usuario, ':ip' => $ip]);
+    $db->delete($sql, [':usuario' => $usuario, ':ip' => $ip]);
 }
 
 function cleanupOldLoginAttempts(database $db): void
@@ -80,7 +73,7 @@ function cleanupOldLoginAttempts(database $db): void
     $sql = "DELETE FROM login_attempts
             WHERE (lock_until IS NOT NULL AND lock_until < NOW())
                OR updated_at < (NOW() - INTERVAL 7 DAY)";
-    $db->query($sql);
+    $db->delete($sql);
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -120,7 +113,7 @@ if ($ipAttempt['lock_until_ts'] > time()) {
 
 $params = [':usuario' => $usuario];
 $sql = "SELECT * FROM usuarios WHERE usuario = :usuario LIMIT 1";
-$result = $db->query($sql, $params);
+$result = $db->select($sql, $params);
 
 if (($result['status'] ?? '') === 'error') {
     header('Location: index.php?page=404');
@@ -155,6 +148,7 @@ clearLoginAttempts($db, GLOBAL_IP_SCOPE, $ipAddress);
 
 session_regenerate_id(true);
 $_SESSION['usuario'] = $usuario_db;
+unset($_SESSION['usuario']->senha); // nao armazenar hash na sessao
 $_SESSION['ultimo_acesso'] = time();
 $_SESSION['session_token'] = createSessionToken();
 try {
@@ -178,7 +172,7 @@ try {
     setLoginErrorAndRedirect('Falha de configuracao de seguranca. Contate o administrador.');
 }
 
-if ($usuario_db->senha_temporaria == 1) {
+if ((int)$usuario_db->senha_temporaria === 1) {
     header('Location: index.php?page=trocar_senha');
     exit;
 }

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../config/database.php';
 
 function getSessionClientIp(): string
 {
-    return trim($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+    return getClientIp();
 }
 
 function getSessionUserAgent(): string
@@ -25,7 +25,7 @@ function ensureUserSessionsTable(database $db): void
         return;
     }
 
-    $result = $db->query("SELECT 1 FROM user_sessions LIMIT 1");
+    $result = $db->select("SELECT 1 FROM user_sessions LIMIT 1");
     if (($result['status'] ?? '') !== 'success') {
         throw new RuntimeException('Tabela user_sessions indisponivel. Execute a migracao de banco.');
     }
@@ -42,7 +42,7 @@ function registerUniqueSession(database $db, int $usuarioId, string $token): voi
 {
     ensureUserSessionsTable($db);
 
-    $db->query(
+    $db->insert(
         "INSERT INTO user_sessions (usuario_id, session_token_hash, session_id, ip_address, user_agent, active, last_seen)
          VALUES (:usuario_id, :session_token_hash, :session_id, :ip_address, :user_agent, 1, NOW())
          ON DUPLICATE KEY UPDATE
@@ -67,7 +67,7 @@ function invalidateUniqueSession(database $db, int $usuarioId, ?string $token = 
 {
     ensureUserSessionsTable($db);
     if ($token) {
-        $db->query(
+        $db->update(
             "UPDATE user_sessions
              SET active = 0, updated_at = CURRENT_TIMESTAMP
              WHERE usuario_id = :usuario_id
@@ -80,7 +80,7 @@ function invalidateUniqueSession(database $db, int $usuarioId, ?string $token = 
         return;
     }
 
-    $db->query(
+    $db->update(
         "UPDATE user_sessions
          SET active = 0, updated_at = CURRENT_TIMESTAMP
          WHERE usuario_id = :usuario_id",
@@ -95,7 +95,7 @@ function isUniqueSessionValid(database $db, int $usuarioId, ?string $token): boo
     }
 
     ensureUserSessionsTable($db);
-    $result = $db->query(
+    $result = $db->select(
         "SELECT session_token_hash, session_id, active
          FROM user_sessions
          WHERE usuario_id = :usuario_id
@@ -116,7 +116,7 @@ function isUniqueSessionValid(database $db, int $usuarioId, ?string $token): boo
         return false;
     }
 
-    $db->query(
+    $db->update(
         "UPDATE user_sessions
          SET session_id = :session_id,
              ip_address = :ip_address,

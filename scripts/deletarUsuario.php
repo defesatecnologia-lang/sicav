@@ -1,10 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario']->nivel_acesso !== 'admin') {
-    header('Location: index.php?page=nao_autorizado');
-    exit;
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     $_SESSION['erro'] = 'Metodo invalido para esta operacao.';
@@ -27,14 +23,14 @@ if (isset($_POST['id'])) {
         exit;
     }
 
-    $result_admin_count = $db->query(
+    $result_admin_count = $db->select(
         "SELECT COUNT(*) AS total FROM usuarios WHERE nivel_acesso = 'admin' AND ativo = 1"
     );
     $admin_count = ($result_admin_count['status'] === 'success' && !empty($result_admin_count['data']))
         ? (int) $result_admin_count['data'][0]->total
         : 0;
 
-    $target_is_admin = $db->query(
+    $target_is_admin = $db->select(
         "SELECT nivel_acesso FROM usuarios WHERE id = :id",
         [':id' => $id]
     );
@@ -50,7 +46,7 @@ if (isset($_POST['id'])) {
 
     $sql = "DELETE FROM usuarios WHERE id = :id";
     $params = [':id' => $id];
-    $result = $db->query($sql, $params);
+    $result = $db->delete($sql, $params);
     
     if ($result['status'] === 'success') {
         $_SESSION['sucesso'] = 'Usuário excluído com sucesso!';

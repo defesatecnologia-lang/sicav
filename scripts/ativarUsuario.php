@@ -1,10 +1,6 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario']->nivel_acesso !== 'admin') {
-    header('Location: index.php?page=nao_autorizado');
-    exit;
-}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     $_SESSION['erro'] = 'Metodo invalido para esta operacao.';
@@ -23,7 +19,7 @@ if (isset($_POST['id'])) {
     
     $sql = "UPDATE usuarios SET ativo = 1 WHERE id = :id";
     $params = [':id' => $id];
-    $result = $db->query($sql, $params);
+    $result = $db->update($sql, $params);
     
     if ($result['status'] === 'success') {
         $_SESSION['sucesso'] = 'Usuário ativado com sucesso!';

@@ -1,24 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('supervisor');
-
-function sanitizeSpreadsheetCell($value): string
-{
-    $text = trim((string) ($value ?? ''));
-    if ($text === '') {
-        return '';
-    }
-
-    $first = substr($text, 0, 1);
-    if (in_array($first, ['=', '+', '-', '@'], true)) {
-        return "'" . $text;
-    }
-
-    return $text;
-}
+apiRequireEndpointAccess();
 
 if (!isset($_GET['exportar']) || $_GET['exportar'] !== 'excel') {
     apiError('Parametro invalido', 400);
@@ -26,7 +10,7 @@ if (!isset($_GET['exportar']) || $_GET['exportar'] !== 'excel') {
 
 try {
     $db = new database();
-    $result = $db->query("SELECT * FROM visitorinfo ORDER BY data_entrada DESC");
+    $result = $db->select("SELECT * FROM visitorinfo ORDER BY data_entrada DESC");
 
     header('Content-Type: application/vnd.ms-excel');
     header('Content-Disposition: attachment; filename="relatorio_visitantes_' . date('Y-m-d') . '.xls"');

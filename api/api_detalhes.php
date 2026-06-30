@@ -1,9 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('supervisor');
+apiRequireEndpointAccess();
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 if ($id <= 0) {
@@ -12,7 +11,7 @@ if ($id <= 0) {
 
 try {
     $db = new database();
-    $result = $db->query("SELECT * FROM visitorinfo WHERE id = :id", [':id' => $id]);
+    $result = $db->select("SELECT * FROM visitorinfo WHERE id = :id", [':id' => $id]);
     if ($result['success'] !== true || count($result['data']) === 0) {
         apiError('Visitante nao encontrado', 404);
     }

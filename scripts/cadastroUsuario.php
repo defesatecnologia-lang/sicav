@@ -6,11 +6,6 @@ require_once __DIR__ . '/../inc/navbar.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../inc/usuarios_helpers.php';
 
-// ⭐⭐ VERIFICAÇÃO DE ACESSO ADMIN ⭐⭐
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario']->nivel_acesso !== 'admin') {
-    header('Location: index.php?page=nao_autorizado');
-    exit;
-}
 $db = new database();
 
 function inserirUsuario($dbConn) {
@@ -54,7 +49,7 @@ function inserirUsuario($dbConn) {
                 ':nivel_acesso' => $nivel_acesso
             ];
             
-            $result = $dbConn->query($sql, $params);
+            $result = $dbConn->insert($sql, $params);
 
             if ($result['status'] === 'success') {
                 $_SESSION["status_cadastro"] = true;
@@ -128,7 +123,7 @@ $listUsuarios = listarUsuariosComSenhaTemporaria($db);
                                 </td>
                                 <td><?= htmlspecialchars($usuario->data ?? '') ?></td>
                                 <td>
-                                    <?php if ($usuario->senha_temporaria == 1): ?>
+                                    <?php if ((int)$usuario->senha_temporaria === 1): ?>
                                         <span class="badge bg-warning">Senha Temporária</span>
                                     <?php else: ?>
                                         <span class="badge bg-success">Senha Definida</span>

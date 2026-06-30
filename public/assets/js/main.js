@@ -28,14 +28,21 @@ function showToast(message, type = "info") {
   toastEl.setAttribute("aria-live", "assertive");
   toastEl.setAttribute("aria-atomic", "true");
 
-  toastEl.innerHTML = `
-        <div class="d-flex">
-            <div class="toast-body">
-                ${message}
-            </div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    `;
+  const bodyDiv = document.createElement('div');
+  bodyDiv.className = 'toast-body';
+  bodyDiv.textContent = message;
+
+  const dFlex = document.createElement('div');
+  dFlex.className = 'd-flex';
+  dFlex.appendChild(bodyDiv);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.type = 'button';
+  closeBtn.className = 'btn-close btn-close-white me-2 m-auto';
+  closeBtn.setAttribute('data-bs-dismiss', 'toast');
+
+  dFlex.appendChild(closeBtn);
+  toastEl.appendChild(dFlex);
 
   toastContainer.appendChild(toastEl);
 

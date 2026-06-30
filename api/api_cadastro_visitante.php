@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../inc/validators.php';
 
 define('FOTOS_DIR', __DIR__ . '/../fotos_visitantes/');
@@ -11,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     apiError('Metodo invalido', 405);
 }
 
-apiRequireAuth('user');
+apiRequireEndpointAccess();
 apiRequireCsrf();
 
 if (!is_dir(FOTOS_DIR) && !mkdir(FOTOS_DIR, 0755, true) && !is_dir(FOTOS_DIR)) {
@@ -113,9 +112,9 @@ try {
     $cpf = preg_replace('/\D/', '', (string) $data->cpf);
     $placa = !empty($data->placa) ? preg_replace('/[^A-Za-z0-9]/', '', strtoupper((string) $data->placa)) : null;
 
-    $resultCheck = $db->query(
-        "SELECT id, nome_completo FROM visitorinfo WHERE numero_cpf = ? AND status = 1 ORDER BY data_entrada DESC LIMIT 1",
-        [$cpf]
+    $resultCheck = $db->select(
+        "SELECT id, nome_completo FROM visitorinfo WHERE numero_cpf = :cpf AND status = 1 ORDER BY data_entrada DESC LIMIT 1",
+        [':cpf' => $cpf]
     );
     if ($resultCheck['status'] === 'success' && !empty($resultCheck['data'])) {
         $visitanteAtivo = $resultCheck['data'][0];
@@ -123,9 +122,9 @@ try {
     }
 
     if ($placa) {
-        $resultCheckPlaca = $db->query(
-            "SELECT id, nome_completo FROM visitorinfo WHERE veiculo_placa = ? AND status = 1 ORDER BY data_entrada DESC LIMIT 1",
-            [$placa]
+        $resultCheckPlaca = $db->select(
+            "SELECT id, nome_completo FROM visitorinfo WHERE veiculo_placa = :placa AND status = 1 ORDER BY data_entrada DESC LIMIT 1",
+            [':placa' => $placa]
         );
         if ($resultCheckPlaca['status'] === 'success' && !empty($resultCheckPlaca['data'])) {
             $visitanteAtivo = $resultCheckPlaca['data'][0];
@@ -136,22 +135,22 @@ try {
     $sql = "INSERT INTO visitorinfo 
             (nome_completo, numero_cpf, veiculo_placa, telefone, email, empresa, 
             data_entrada, status, foto_caminho, encontrar_com, tipo_visita, cadastro_original_id) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), 1, ?, ?, ?, ?)";
+            VALUES (:nome, :cpf, :placa, :telefone, :email, :empresa, NOW(), 1, :foto, :encontrar, :tipo, :original_id)";
 
     $params = [
-        $data->uname,
-        $cpf,
-        $placa,
-        $data->mobileno ?? null,
-        $data->email ?? null,
-        $data->from ?? null,
-        $fotoPath,
-        $data->meet,
-        $data->representing,
-        $data->original_id ?? null,
+        ':nome' => $data->uname,
+        ':cpf' => $cpf,
+        ':placa' => $placa,
+        ':telefone' => $data->mobileno ?? null,
+        ':email' => $data->email ?? null,
+        ':empresa' => $data->from ?? null,
+        ':foto' => $fotoPath,
+        ':encontrar' => $data->meet,
+        ':tipo' => $data->representing,
+        ':original_id' => $data->original_id ?? null,
     ];
 
-    $result = $db->query($sql, $params);
+    $result = $db->select($sql, $params);
     if ($result['status'] !== 'success') {
         throw new Exception('Erro ao inserir no banco de dados');
     }

@@ -1,12 +1,6 @@
 <?php
-requererAcesso('admin'); // ⭐⭐ MANTÉM APENAS ADMIN ⭐⭐
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
-
-if (!isset($_SESSION['usuario']) || $_SESSION['usuario']->nivel_acesso !== 'admin') {
-    header('Location: index.php?page=nao_autorizado');
-    exit;
-}
 
 $db = new database();
 
@@ -18,7 +12,7 @@ $filtro_acao = $_GET['acao'] ?? '';
 $filtro_visitante = $_GET['visitante_id'] ?? '';
 
 // Buscar lista de usuários para o filtro
-$usuarios = $db->query("SELECT id, nome FROM usuarios ORDER BY nome");
+$usuarios = $db->select("SELECT id, nome FROM usuarios ORDER BY nome");
 
 // Construir query com filtros
 $sql = "
@@ -56,11 +50,11 @@ if (!empty($filtro_visitante)) {
 
 $sql .= " ORDER BY a.data_acao DESC LIMIT 1000";
 
-$result = $db->query($sql, $params);
+$result = $db->select($sql, $params);
 $auditorias = $result['status'] === 'success' ? $result['data'] : [];
 
 // Estatísticas
-$stats = $db->query("
+$stats = $db->select("
     SELECT 
         acao,
         COUNT(*) as total,

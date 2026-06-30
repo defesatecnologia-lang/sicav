@@ -59,7 +59,7 @@ try {
         echo "Verificando usuário: {$user['username']} ...";
 
         // Verificar se usuário já existe
-        $result = $db->query(
+        $result = $db->select(
             "SELECT id FROM usuarios WHERE usuario = ?",
             [$user['username']]
         );
@@ -73,7 +73,7 @@ try {
         $senhaHash = password_hash($user['password'], PASSWORD_BCRYPT, ['cost' => 10]);
 
         // Inserir usuário
-        $insertResult = $db->query(
+        $insertResult = $db->insert(
             "INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, ativo, senha_temporaria) 
              VALUES (?, ?, ?, ?, 1, ?)",
             [

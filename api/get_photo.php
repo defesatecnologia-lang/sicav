@@ -1,9 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('user');
+apiRequireEndpointAccess();
 
 $visitorId = isset($_GET['vid']) ? (int) $_GET['vid'] : 0;
 if ($visitorId <= 0) {
@@ -13,7 +12,7 @@ if ($visitorId <= 0) {
 
 try {
     $db = new database();
-    $result = $db->query("SELECT foto_caminho FROM visitorinfo WHERE id = :id", [':id' => $visitorId]);
+    $result = $db->select("SELECT foto_caminho FROM visitorinfo WHERE id = :id", [':id' => $visitorId]);
 
     if ($result['status'] === 'success' && count($result['data']) > 0) {
         $foto = $result['data'][0]->foto_caminho ?? null;

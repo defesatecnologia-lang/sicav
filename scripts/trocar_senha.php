@@ -3,12 +3,7 @@ ob_start();
 
 require_once __DIR__ . '/../config/database.php';
 
-// Verifica se o usuário está logado
-if (!isset($_SESSION['usuario'])) {
-    header('Location: index.php?page=login');
-    exit;
-}
-if ($_SESSION['usuario']->senha_temporaria == 0) {
+if ($_SESSION['usuario']->senha_temporaria === 0) {
     header('Location: index.php?page=home');
     exit;
 }
@@ -31,7 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
     } elseif (strlen($nova_senha) < 6) {
         $_SESSION['erro_troca_senha'] = 'A nova senha deve ter pelo menos 6 caracteres!';
     } else {
-        if (!password_verify($senha_atual, $_SESSION['usuario']->senha)) {
+        $sqlHash = "SELECT senha FROM usuarios WHERE id = :id LIMIT 1";
+        $resultHash = $db->select($sqlHash, [':id' => $_SESSION['usuario']->id]);
+        $hashAtual = ($resultHash['status'] === 'success' && !empty($resultHash['data'])) ? $resultHash['data'][0]->senha : null;
+        if (!$hashAtual || !password_verify($senha_atual, $hashAtual)) {
             $_SESSION['erro_troca_senha'] = 'Senha atual incorreta!';
         } else {
             $senha_hash = password_hash($nova_senha, PASSWORD_DEFAULT);
@@ -40,10 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
                 ':senha' => $senha_hash,
                 ':id' => $_SESSION['usuario']->id
             ];
-            $result = $db->query($sql, $params);            
+            $result = $db->update($sql, $params);            
             if ($result['status'] === 'success') {
                 $_SESSION['sucesso_troca_senha'] = 'Senha alterada com sucesso!';
                 $_SESSION['usuario']->senha_temporaria = 0;
+                unset($_SESSION['usuario']->senha);
                 ob_end_clean();
                 header('Location: index.php?page=home');
                 exit;

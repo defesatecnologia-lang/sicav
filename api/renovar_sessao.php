@@ -5,9 +5,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../inc/security.php';
-require_once __DIR__ . '/../inc/single_session.php';
-require_once __DIR__ . '/../config/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     apiError('Metodo nao permitido', 405);
@@ -48,6 +45,9 @@ if (!isset($_SESSION['ultimo_acesso'])) {
     $_SESSION['ultimo_acesso'] = $now;
 }
 
+// Rate limiting: impedir renovacao mais frequente que 30s
+$isRateLimited = isset($_SESSION['ultima_renovacao']) && ($now - $_SESSION['ultima_renovacao']) < 30;
+
 $inatividade = $now - (int) $_SESSION['ultimo_acesso'];
 $time_left = $tempo_maximo - $inatividade;
 
@@ -57,7 +57,16 @@ if ($time_left <= 0) {
     apiError('Sessao expirada', 401);
 }
 
+if ($isRateLimited) {
+    apiJsonResponse([
+        'success' => true,
+        'message' => 'Sessao renovada',
+        'time_left' => $time_left
+    ]);
+}
+
 $_SESSION['ultimo_acesso'] = $now;
+$_SESSION['ultima_renovacao'] = $now;
 
 if (!isset($_SESSION['last_regenerate']) || ($now - (int) $_SESSION['last_regenerate']) >= 300) {
     session_regenerate_id(true);

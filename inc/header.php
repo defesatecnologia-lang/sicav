@@ -15,13 +15,18 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="<?= htmlspecialchars($GLOBALS['APP_BASE_PATH'] ?? '', ENT_QUOTES, 'UTF-8') ?>/assets/css/main.css">
+    <style nonce="<?= htmlspecialchars($GLOBALS['CSP_NONCE'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+        :root {
+            --bg-image-path: url('<?= htmlspecialchars($GLOBALS['APP_BASE_PATH'] ?? '', ENT_QUOTES, 'UTF-8') ?>/imagens/tela_fundo.png');
+        }
+    </style>
     <script nonce="<?= htmlspecialchars($GLOBALS['CSP_NONCE'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
         // Define a BASE_URL para ser usada em requisições AJAX
         const BASE_URL = '<?= htmlspecialchars(rtrim($GLOBALS['APP_PUBLIC_PATH'] ?? '/public', '/') . '/', ENT_QUOTES, 'UTF-8') ?>';
         const CSRF_TOKEN = '<?= htmlspecialchars(getCsrfToken(), ENT_QUOTES, 'UTF-8') ?>';
     </script>
 </head>
-<body>
+<body class="<?= htmlspecialchars($GLOBALS['body_class'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
 
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

@@ -1,9 +1,8 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('admin');
+apiRequireEndpointAccess();
 
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 if ($id <= 0) {
@@ -12,7 +11,7 @@ if ($id <= 0) {
 
 try {
     $db = new database();
-    $result = $db->query(
+    $result = $db->select(
         "SELECT a.*, v.nome_completo as visitante_nome, v.numero_cpf as visitante_cpf,
                 u.nome as usuario_nome, u.usuario as usuario_login
          FROM auditoria_visitantes a

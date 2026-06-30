@@ -31,6 +31,11 @@ function currentUserId(): ?int
     return (int) $_SESSION['usuario']->id;
 }
 
+function getClientIp(): string
+{
+    return trim($_SERVER['REMOTE_ADDR'] ?? 'unknown');
+}
+
 function userHasAccess(string $required = 'user'): bool
 {
     if (!isset($_SESSION['usuario'])) {

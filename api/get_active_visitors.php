@@ -1,13 +1,12 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
-require_once __DIR__ . '/../config/database.php';
 
-apiRequireAuth('user');
+apiRequireEndpointAccess();
 
 try {
     $db = new database();
-    $result = $db->query("
+    $result = $db->select("
         SELECT 
             id,
             nome_completo as nome,
