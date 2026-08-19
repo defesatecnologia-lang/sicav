@@ -14,7 +14,7 @@ jobs:
       matrix:
         php: ['8.2', '8.3']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -37,3 +37,29 @@ jobs:
 
       - name: Run PHPUnit
         run: vendor/bin/phpunit
+
+  frontend:
+    name: Frontend (JS + HTML)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: JS syntax check
+        run: |
+          find public/assets/js -name '*.js' -print0 \
+            | xargs -0 -n1 node --check
+
+      - name: Run JS tests
+        run: node --test "tests/js/*.test.mjs"
+
+      - name: HTML smoke test
+        run: |
+          VISITORPASS_DB_PASS=ci-smoke-test php -S 127.0.0.1:8877 -t public &
+          sleep 1
+          VISITORPASS_DB_PASS=ci-smoke-test php tests/html/smoke_test.php
