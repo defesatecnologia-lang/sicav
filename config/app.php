@@ -12,6 +12,9 @@ function appEnv(string $key, ?string $default = null): ?string
 if (!defined('SESSION_TIMEOUT')) {
     define('SESSION_TIMEOUT', (int) appEnv('VISITORPASS_SESSION_TIMEOUT', '3600'));
 }
+if (!defined('SESSION_ABSOLUTE_LIFETIME')) {
+    define('SESSION_ABSOLUTE_LIFETIME', (int) appEnv('VISITORPASS_SESSION_ABSOLUTE_LIFETIME', '43200'));
+}
 if (!defined('APP_NAME')) {
     define('APP_NAME', appEnv('VISITORPASS_APP_NAME', 'Sistema de Visitantes'));
 }

@@ -75,6 +75,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 # Configure variáveis seguras
 vim .env
 # Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD
+# E gere a chave de criptografia do MFA (64 hex chars = 32 bytes):
+#   echo "VISITORPASS_MFA_KEY=$(openssl rand -hex 32)" >> .env
 
 # Build e inicie (phpMyAdmin e porta do MySQL NAO sao publicados em producao)
 docker compose up -d --build

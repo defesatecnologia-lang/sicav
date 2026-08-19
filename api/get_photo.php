@@ -1,8 +1,16 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
 
 apiRequireEndpointAccess();
+
+try {
+    $db = new database();
+    enforceRateLimit($db, 'get_photo', 60, 60);
+} catch (Throwable $e) {
+    logApiException($e, ['context' => 'rate_limit']);
+}
 
 $visitorId = isset($_GET['vid']) ? (int) $_GET['vid'] : 0;
 if ($visitorId <= 0) {

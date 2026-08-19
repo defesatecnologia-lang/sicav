@@ -1,11 +1,19 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
 
 apiRequireEndpointAccess();
 
 if (!isset($_GET['exportar']) || $_GET['exportar'] !== 'excel') {
     apiError('Parametro invalido', 400);
+}
+
+try {
+    $db = new database();
+    enforceRateLimit($db, 'api_export', 10, 60);
+} catch (Throwable $e) {
+    logApiException($e, ['context' => 'rate_limit']);
 }
 
 try {

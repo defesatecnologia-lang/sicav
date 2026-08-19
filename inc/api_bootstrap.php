@@ -5,6 +5,7 @@ require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/single_session.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/log_event.php';
 
 function logApiException(Throwable $e, array $context = []): void
 {
@@ -16,6 +17,7 @@ function logApiException(Throwable $e, array $context = []): void
         'endpoint' => $_SERVER['REQUEST_URI'] ?? '',
         'user_id' => currentUserId(),
         'ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+        'request_id' => getRequestId(),
     ], $context);
 
     error_log('API_ERROR ' . json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
@@ -109,6 +111,11 @@ function apiRequireAuth(string $requiredAccess = 'user'): void
     }
 
     if (!userHasAccess($requiredAccess)) {
+        logEvent('AUTHORIZATION_DENIED', [
+            'endpoint' => $_SERVER['SCRIPT_NAME'] ?? '',
+            'required' => $requiredAccess,
+            'granted' => $_SESSION['usuario']->nivel_acesso ?? 'user',
+        ]);
         apiError('Acesso negado', 403);
     }
 }

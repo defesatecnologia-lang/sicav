@@ -11,8 +11,11 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . '/../inc/security.php';
 require_once __DIR__ . '/../inc/single_session.php';
+require_once __DIR__ . '/../inc/log_event.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
 require_once __DIR__ . '/../config/database.php';
 header('Content-Type: text/html; charset=UTF-8');
+ob_start();
 
 $tempo_maximo = SESSION_TIMEOUT;
 $page = $_GET['page'] ?? 'home';
@@ -47,6 +50,11 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(self), microphone=(), geolocation=()');
 header('X-Frame-Options: SAMEORIGIN');
 
+// HSTS apenas em HTTPS (dev HTTP nao deve enviar para nao quebrar a navegacao local)
+if (isHttpsRequest()) {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
+
 $isApi = str_starts_with($page, 'api/');
 
 function verificarTimeout($isApi = false, $tempo_maximo = SESSION_TIMEOUT)
@@ -76,6 +84,7 @@ function verificarTimeout($isApi = false, $tempo_maximo = SESSION_TIMEOUT)
         }
 
         clearLocalSessionState();
+        logEvent('SESSION_EXPIRED', ['reason' => 'inactivity']);
 
         if ($isApi) {
             http_response_code(401);
@@ -140,6 +149,7 @@ function enforceUniqueSession(bool $isApi = false): void
     }
 
     clearLocalSessionState();
+    logEvent('SESSION_REVOKED', ['reason' => 'concurrent_login']);
 
     if ($isApi) {
         http_response_code(401);
@@ -201,8 +211,13 @@ $router->any('nao_autorizado', function () {
     require_once __DIR__ . '/../inc/footer.php';
 });
 
+$router->any('mfa_challenge', function () {
+    require_once __DIR__ . '/../scripts/mfa_challenge.php';
+    exit;
+});
+
 // Rotas com auth user
-$userRoutes = ['home', 'trocar_senha', 'cadastro_visitantes', 'listar_visitantes'];
+$userRoutes = ['home', 'trocar_senha', 'cadastro_visitantes', 'listar_visitantes', 'admin_mfa'];
 foreach ($userRoutes as $route) {
     $router->any($route, function () use ($route) {
         require_once __DIR__ . '/../inc/header.php';
@@ -228,6 +243,14 @@ $adminRoutes = ['administracao', 'cadastroUsuario', 'listarUsuario', 'editarUsua
     'admin_login_locks', 'desbloquear_login'];
 foreach ($adminRoutes as $route) {
     $router->any($route, function () use ($route) {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            try {
+                $db = new database();
+                enforceRateLimit($db, 'admin_' . $route, 30, 60);
+            } catch (Throwable $e) {
+                error_log('Erro no rate limit admin: ' . $e->getMessage());
+            }
+        }
         require_once __DIR__ . '/../inc/header.php';
         require_once __DIR__ . '/../scripts/' . $route . '.php';
         $GLOBALS['time_left'] = $GLOBALS['time_left'] ?? 0;

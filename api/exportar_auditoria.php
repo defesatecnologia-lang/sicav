@@ -1,12 +1,20 @@
 <?php
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
 
 apiRequireEndpointAccess();
 
 $formato = $_GET['formato'] ?? 'csv';
 $dataInicio = $_GET['data_inicio'] ?? date('Y-m-d', strtotime('-30 days'));
 $dataFim = $_GET['data_fim'] ?? date('Y-m-d');
+
+try {
+    $db = new database();
+    enforceRateLimit($db, 'exportar_auditoria', 10, 60);
+} catch (Throwable $e) {
+    logApiException($e, ['context' => 'rate_limit']);
+}
 
 try {
     $db = new database();

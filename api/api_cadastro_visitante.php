@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../inc/api_bootstrap.php';
 require_once __DIR__ . '/../inc/validators.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
 
 define('FOTOS_DIR', __DIR__ . '/../fotos_visitantes/');
 define('MAX_IMAGE_BYTES', 5 * 1024 * 1024);
@@ -12,6 +13,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 apiRequireEndpointAccess();
 apiRequireCsrf();
+
+try {
+    $db = new database();
+    enforceRateLimit($db, 'api_cadastro_visitante', 30, 60);
+} catch (Throwable $e) {
+    logApiException($e, ['context' => 'rate_limit']);
+}
 
 if (!is_dir(FOTOS_DIR) && !mkdir(FOTOS_DIR, 0755, true) && !is_dir(FOTOS_DIR)) {
     apiError('Falha ao criar diretorio de fotos', 500);

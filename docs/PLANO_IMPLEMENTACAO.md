@@ -38,11 +38,11 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
 | SEC-DOCKER-007 | Docker | Médio | Média | 2 | Confirmado | Validado |
 | SEC-PASS-001 | Autenticação | Médio | Média | 1 | Confirmado | Validado |
 | SEC-COOKIE-001 | Sessões | Alto | Alta | 1 | Confirmado | Validado |
-| SEC-SESS-001 | Sessões | Médio | Média | 3 | Confirmado | Aberto |
-| SEC-RATE-001 | Segurança | Médio | Média | 2 | Confirmado | Aberto |
-| SEC-MFA-001 | Autenticação | Alto | Alta | 5 | Confirmado | Aberto |
-| SEC-HDR-001 | Configuração | Médio | Média | 2 | Confirmado | Aberto |
-| SEC-LOG-001 | Logs | Médio | Média | 2 | Confirmado | Aberto |
+| SEC-SESS-001 | Sessões | Médio | Média | 3 | Confirmado | Validado |
+| SEC-RATE-001 | Segurança | Médio | Média | 2 | Confirmado | Validado |
+| SEC-MFA-001 | Autenticação | Alto | Alta | 5 | Confirmado | Validado |
+| SEC-HDR-001 | Configuração | Médio | Média | 2 | Confirmado | Validado |
+| SEC-LOG-001 | Logs | Médio | Média | 2 | Confirmado | Validado |
 | QUAL-BUG-001 | Backend | Alto | Alta | 1 | Confirmado | Validado |
 
 ---
@@ -287,11 +287,11 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
 3. ~~SEC-DOCKER-007: redes internas para o banco.~~ Validado.
 
 ### Fase 2 — Autenticação e Sessões
-1. SEC-SESS-001: expiração/revogação de sessões na tabela.
-2. SEC-RATE-001: rate limiting genérico.
-3. SEC-HDR-001: HSTS + TLS no proxy (produção).
-4. SEC-LOG-001: eventos estruturados + request_id.
-5. SEC-MFA-001: TOTP para admins (esforço alto, planejar isoladamente).
+1. ~~SEC-SESS-001: expiração/revogação de sessões na tabela.~~ Validado.
+2. ~~SEC-RATE-001: rate limiting genérico.~~ Validado.
+3. ~~SEC-HDR-001: HSTS + TLS no proxy (produção).~~ Validado (HSTS no app; TLS depende do proxy).
+4. ~~SEC-LOG-001: eventos estruturados + request_id.~~ Validado.
+5. ~~SEC-MFA-001: TOTP para admins (esforço alto, planejar isoladamente).~~ Validado.
 
 ### Fase 3 — Validação e Testes de Segurança
 - Executar testes obrigatórios da especificação (§62): autenticação (brute force, session fixation), autorização (IDOR/BOLA), web (SQLi, XSS, CSRF, path traversal), arquivos (upload inválido, executável, download sem autorização), container (usuário, capabilities, ports).
@@ -336,6 +336,27 @@ Correções adicionais descobertas durante a validação da Fase 1 (bugs pré-ex
 
 Validação da suíte: `vendor/bin/phpunit` → 114 testes, 129 asserções OK.
 
+### Fase 2 — Registro de Execução
+
+Data de execução: 2026-08-19.
+
+| ID | Correção | Validação |
+|---|---|---|
+| SEC-LOG-001 | `inc/log_event.php` (`getRequestId()` + `logEvent()` JSON → stderr, evento `AUDIT`); aplicado em login (LOGIN_FAILURE/LOGIN_SUCCESS), logout (LOGOUT), API (AUTHORIZATION_DENIED), sessão (SESSION_CREATED/EXPIRED/REVOKED), MFA e rate limit | Eventos AUDIT observados nos logs do container |
+| SEC-SESS-001 | `SESSION_ABSOLUTE_LIFETIME`; migração: `expires_at`, `last_activity_at`, `revoked_at` em `user_sessions`; expiração por tempo absoluto, revogação em logout/novo login/concorrência; `purgeExpiredSessions` no login | Logout → `active=0` + `revoked_at` preenchido; timeout → SESSION_EXPIRED |
+| SEC-RATE-001 | Tabela `rate_limits` + `inc/rate_limit.php` (janela deslizante por IP+rota); get_photo 60/min, api_export 10/min, exportar_auditoria 10/min, api_cadastro_visitante 30/min, rotas admin POST 30/min | get_photo: 60×200 + 429; api_export: 10×200 + 429; admin POST: 429 após limite; RATE_LIMIT_TRIGGERED auditado |
+| SEC-HDR-001 | `Strict-Transport-Security` enviado quando `isHttpsRequest()` (produção atrás de proxy TLS); nota no `apache.conf` | Header presente com `X-Forwarded-Proto: https`; ausente em HTTP (dev) |
+| SEC-MFA-001 | `inc/totp.php` (RFC 6238, validado com vetores do padrão) + `inc/mfa.php` (secret criptografado com `VISITORPASS_MFA_KEY` via sodium, 10 recovery codes); tabelas `usuarios_mfa`/`mfa_recovery_codes`; gate no login (`scripts/mfa_challenge.php`); setup admin (`scripts/admin_mfa.php`); `finalizeLoginSession()` extraído | Fluxo completo: setup → secret+10 codes → confirm TOTP → login exige challenge → TOTP/recovery code válidos → home; código inválido → erro; recovery code consumido (`used=1`) |
+
+Correções adicionais descobertas na Fase 2 (bug pré-existente):
+
+- **Redirects admin quebrados (`headers already sent`):** com `output_buffering=0`, as rotas incluem `inc/header.php` antes do script, então todo `header('Location:')` em scripts admin/user falhava (ex.: `desbloquear_login` → 500; `trocar_senha` emitia warning). Corrigido com `ob_start()` no topo de `public/index.php`. Validação: `desbloquear_login` → 302 OK; trocar_senha → 302 OK.
+- **`revoked_at = '0000-00-00'`:** comparação contra valor zero-date no `isUniqueSessionValid` quebrava sob `NO_ZERO_DATE` (MySQL 8 default sql_mode) → 500 em `trocar_senha`. Removida a comparação legada (revogado agora usa NULL). Validação: login E2E OK sem erros de banco.
+
+Configuração exigida: `VISITORPASS_MFA_KEY` (64 hex chars = 32 bytes) para criptografar secrets TOTP — adicionado ao `docker-compose.yml` (via env), `.env.example` e default de dev em `docker-compose.dev.yml` (somente desenvolvimento). MFA falha de forma segura (setup recusa) se a chave estiver ausente.
+
+Validação da suíte: `vendor/bin/phpunit` → 114 testes, 129 asserções OK.
+
 ---
 
 ## 5. Definition of Done
@@ -357,6 +378,6 @@ Para cada achado, antes de declarar concluído:
 ## 6. Limitações
 
 - Ambiente de produção não acessível; validação limitada ao Docker local.
-- MFA (SEC-MFA-001) exige planejamento de UX e schema; recomendado como fase separada.
-- TLS/HSTS (SEC-HDR-001) dependem do reverse proxy em produção (fora do repositório).
+- MFA (SEC-MFA-001): implementado com TOTP para todos os usuários autenticados (menu do usuário); exigir para admins é decisão de política.
+- TLS/HSTS (SEC-HDR-001) dependem do reverse proxy em produção (fora do repositório); HSTS é emitido pelo app quando a requisição é HTTPS.
 - Análise de performance e testes E2E não executados nesta etapa (registrados como "Não auditado").

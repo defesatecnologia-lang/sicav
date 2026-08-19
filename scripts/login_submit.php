@@ -3,17 +3,12 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 require_once __DIR__ . '/../inc/single_session.php';
+require_once __DIR__ . '/../inc/log_event.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
 
 const MAX_LOGIN_ATTEMPTS = 5;
 const MAX_IP_LOGIN_ATTEMPTS = 15;
 const LOGIN_LOCK_SECONDS = 900; // 15 minutos
-function setLoginErrorAndRedirect(string $mensagem): void
-{
-    $_SESSION['error'] = $mensagem;
-    header('Location: index.php?page=login');
-    exit;
-}
-
 function getLoginAttempt(database $db, string $usuario, string $ip): array
 {
     $sql = "SELECT attempt_count, lock_until
@@ -96,6 +91,8 @@ if ($usuario === '' || $senha === '') {
 
 $db = new database();
 cleanupOldLoginAttempts($db);
+purgeExpiredSessions($db);
+cleanupOldRateLimits($db);
 
 $attempt = getLoginAttempt($db, $usuario, $ipAddress);
 if ($attempt['lock_until_ts'] > time()) {
@@ -123,6 +120,7 @@ if (($result['status'] ?? '') === 'error') {
 $isInvalid = count($result['data']) === 0 || !password_verify($senha, $result['data'][0]->senha);
 $isInactive = !$isInvalid && (int)($result['data'][0]->ativo ?? 0) !== 1;
 if ($isInactive) {
+    logEvent('LOGIN_FAILURE', ['username' => $usuario, 'reason' => 'account_inactive']);
     setLoginErrorAndRedirect('Usuario bloqueado ou sem permissao de acesso. Contate o administrador.');
 }
 
@@ -130,11 +128,20 @@ if ($isInvalid) {
     $failure = registerLoginFailure($db, $usuario, $ipAddress, (int)$attempt['attempt_count'], MAX_LOGIN_ATTEMPTS);
     $ipFailure = registerLoginFailure($db, GLOBAL_IP_SCOPE, $ipAddress, (int)$ipAttempt['attempt_count'], MAX_IP_LOGIN_ATTEMPTS);
 
+    logEvent('LOGIN_FAILURE', [
+        'username' => $usuario,
+        'reason' => 'invalid_credentials',
+        'attempt_count' => $failure['attempt_count'],
+        'ip_locked' => $ipFailure['locked'],
+    ]);
+
     if ($ipFailure['locked']) {
+        logEvent('LOGIN_FAILURE', ['username' => $usuario, 'reason' => 'ip_locked']);
         setLoginErrorAndRedirect('IP bloqueado por excesso de tentativas. Acesso bloqueado por 15 minutos.');
     }
 
     if ($failure['locked']) {
+        logEvent('LOGIN_FAILURE', ['username' => $usuario, 'reason' => 'account_locked']);
         setLoginErrorAndRedirect('Numero maximo de tentativas excedido. Acesso bloqueado por 15 minutos.');
     }
 
@@ -146,31 +153,20 @@ $usuario_db = $result['data'][0];
 clearLoginAttempts($db, $usuario, $ipAddress);
 clearLoginAttempts($db, GLOBAL_IP_SCOPE, $ipAddress);
 
-session_regenerate_id(true);
-$_SESSION['usuario'] = $usuario_db;
-unset($_SESSION['usuario']->senha); // nao armazenar hash na sessao
-$_SESSION['ultimo_acesso'] = time();
-$_SESSION['session_token'] = createSessionToken();
-try {
-    registerUniqueSession($db, (int)$usuario_db->id, $_SESSION['session_token']);
-} catch (Throwable $e) {
-    error_log('Falha ao registrar sessao unica: ' . $e->getMessage());
-    $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $params['path'],
-            $params['domain'],
-            $params['secure'],
-            $params['httponly']
-        );
-    }
-    session_destroy();
-    setLoginErrorAndRedirect('Falha de configuracao de seguranca. Contate o administrador.');
+logEvent('LOGIN_SUCCESS', ['username' => $usuario_db->usuario]);
+
+require_once __DIR__ . '/../inc/mfa.php';
+
+// Se a conta tem MFA habilitado, exige desafio TOTP antes de concluir o login.
+if (mfaIsEnabled($db, (int) $usuario_db->id)) {
+    $_SESSION['mfa_pending_user_id'] = (int) $usuario_db->id;
+    $_SESSION['mfa_pending_username'] = $usuario_db->usuario;
+    unset($_SESSION['mfa_pending_error']);
+    header('Location: index.php?page=mfa_challenge');
+    exit;
 }
+
+finalizeLoginSession($db, $usuario_db);
 
 if ((int)$usuario_db->senha_temporaria === 1) {
     header('Location: index.php?page=trocar_senha');

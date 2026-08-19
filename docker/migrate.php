@@ -82,11 +82,62 @@ try {
         user_agent VARCHAR(255) NOT NULL,
         active TINYINT(1) NOT NULL DEFAULT 1,
         last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        expires_at DATETIME NULL,
+        last_activity_at DATETIME NULL,
+        revoked_at DATETIME NULL,
         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         CONSTRAINT fk_user_sessions_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
         INDEX idx_user_sessions_active (active),
+        INDEX idx_user_sessions_expires (expires_at),
         INDEX idx_user_sessions_updated_at (updated_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+    // Migracoes incrementais idempotentes (tabelas existentes de versoes anteriores)
+    $userSessionColumns = $pdo->query("SHOW COLUMNS FROM user_sessions")->fetchAll(PDO::FETCH_COLUMN);
+    $userSessionColumnMap = array_flip($userSessionColumns);
+    if (!isset($userSessionColumnMap['expires_at'])) {
+        $pdo->exec("ALTER TABLE user_sessions ADD COLUMN expires_at DATETIME NULL AFTER last_seen");
+    }
+    if (!isset($userSessionColumnMap['last_activity_at'])) {
+        $pdo->exec("ALTER TABLE user_sessions ADD COLUMN last_activity_at DATETIME NULL AFTER expires_at");
+    }
+    if (!isset($userSessionColumnMap['revoked_at'])) {
+        $pdo->exec("ALTER TABLE user_sessions ADD COLUMN revoked_at DATETIME NULL AFTER last_activity_at");
+    }
+
+    // Tabela rate_limits (rate limiting generico por IP + rota + janela)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS rate_limits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        rate_key VARCHAR(191) NOT NULL,
+        request_count INT NOT NULL DEFAULT 0,
+        window_started_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uk_rate_key (rate_key),
+        INDEX idx_rate_limits_window (window_started_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+    // Tabela usuarios_mfa (TOTP)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS usuarios_mfa (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id INT NOT NULL UNIQUE,
+        secret TEXT NOT NULL,
+        enabled TINYINT(1) NOT NULL DEFAULT 0,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_usuarios_mfa_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+
+    // Tabela mfa_recovery_codes
+    $pdo->exec("CREATE TABLE IF NOT EXISTS mfa_recovery_codes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        usuario_id INT NOT NULL,
+        code_hash CHAR(64) NOT NULL,
+        used TINYINT(1) NOT NULL DEFAULT 0,
+        used_at DATETIME NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_mfa_recovery_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        UNIQUE KEY uk_mfa_recovery (usuario_id, code_hash)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
 
     // Tabela auditoria_visitantes

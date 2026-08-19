@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../inc/security.php';
 require_once __DIR__ . '/../inc/single_session.php';
+require_once __DIR__ . '/../inc/log_event.php';
 configureSessionSecurity();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -14,6 +15,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $usuarioId = currentUserId();
 $sessionToken = $_SESSION['session_token'] ?? null;
 if ($usuarioId) {
+    logEvent('LOGOUT', ['reason' => 'manual']);
     try {
         $db = new database();
         invalidateUniqueSession($db, $usuarioId, $sessionToken);
