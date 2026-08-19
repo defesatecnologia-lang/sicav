@@ -13,6 +13,7 @@ RUN set -eux; \
         libzip-dev \
         unzip \
         git \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -35,19 +36,35 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/custom.ini
 COPY . /var/www/html/
 
 RUN set -eux; \
-    mkdir -p /var/www/html/fotos_visitantes; \
-    chown -R www-data:www-data /var/www/html/fotos_visitantes; \
-    chmod 755 /var/www/html/fotos_visitantes
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
+    if [ "$ENVIRONMENT" = "production" ]; then \
+        composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader; \
+    else \
+        composer install --no-interaction --prefer-dist; \
+    fi; \
+    rm -f /usr/local/bin/composer
 
 RUN set -eux; \
     if [ "$ENVIRONMENT" = "production" ]; then \
         rm -f /var/www/html/.env; \
-        rm -rf /var/www/html/vendor /var/www/html/node_modules /var/www/html/db/*.sh; \
+        rm -rf /var/www/html/node_modules /var/www/html/db/*.sh; \
         find /var/www/html -name "*.md" -delete; \
     fi
 
+RUN set -eux; \
+    groupadd --gid 1000 app && \
+    useradd --uid 1000 --gid app --no-create-home --home-dir /var/www/html --shell /usr/sbin/nologin app && \
+    sed -ri 's/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=app/; s/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=app/' /etc/apache2/envvars && \
+    mkdir -p /var/www/html/fotos_visitantes && \
+    chown -R app:app /var/www/html && \
+    chmod 755 /var/www/html/fotos_visitantes
+
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+WORKDIR /var/www/html
+
+USER app
 
 EXPOSE 80
 

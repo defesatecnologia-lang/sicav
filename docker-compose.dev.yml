@@ -15,7 +15,8 @@ services:
       - db
     restart: unless-stopped
     networks:
-      - visitantes-net
+      - frontend
+      - backend
     logging:
       driver: json-file
       options:

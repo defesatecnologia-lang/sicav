@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Router;
 use App\Middleware\AuthMiddleware;

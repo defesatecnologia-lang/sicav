@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // Garantir que a sessão está ativa
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../inc/security.php';

@@ -29,13 +29,13 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
 
 | ID | Área | Severidade | Prioridade | Esforço | Confiança | Status |
 |---|---|---|---|---:|---:|---|---|
-| SEC-DOCKER-001 | Docker | Alto | Alta | 2 | Confirmado | Aberto |
-| SEC-DOCKER-002 | Docker | Alto | Alta | 2 | Confirmado | Aberto |
+| SEC-DOCKER-001 | Docker | Alto | Alta | 2 | Confirmado | Validado |
+| SEC-DOCKER-002 | Docker | Alto | Alta | 2 | Confirmado | Validado |
 | SEC-DOCKER-003 | Docker | Médio | Média | 1 | Confirmado | Validado |
 | SEC-DOCKER-004 | Docker | Médio | Média | 1 | Confirmado | Validado |
 | SEC-DOCKER-005 | Docker | Alto | Alta | 1 | Confirmado | Validado |
 | SEC-DOCKER-006 | Docker | Alto | Alta | 1 | Confirmado | Validado |
-| SEC-DOCKER-007 | Docker | Médio | Média | 2 | Confirmado | Aberto |
+| SEC-DOCKER-007 | Docker | Médio | Média | 2 | Confirmado | Validado |
 | SEC-PASS-001 | Autenticação | Médio | Média | 1 | Confirmado | Validado |
 | SEC-COOKIE-001 | Sessões | Alto | Alta | 1 | Confirmado | Validado |
 | SEC-SESS-001 | Sessões | Médio | Média | 3 | Confirmado | Aberto |
@@ -61,7 +61,7 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
 - **Implementação recomendada:** Criar usuário não-root (ex.: `app`, UID 1000) no Dockerfile, definir `WORKDIR` e `USER app`, ajustar permissões dos volumes (`fotos_visitantes`). Em `docker-compose.yml`, `user: "1000:1000"`. Verificar escrita em `/var/log/php_errors.log` e `/tmp` (usar `tmpfs`).
 - **Testes:** `docker exec <container> id` deve retornar UID não-root; subir stack e exercitar upload de foto.
 - **Compatibilidade:** Apache precisa de porta >=1024 ou `CAP_NET_BIND_SERVICE`; alternativa: manter bind da porta 80 via `USER` + `cap_add: [NET_BIND_SERVICE]` ou usar `a2enmod` e porta 8080 interna.
-- **Status:** Aberto.
+- **Status:** Validado. Dockerfile cria usuário `app` (UID/GID 1000), define `WORKDIR`/`USER app` e ajusta `APACHE_RUN_USER/GROUP` via `sed` no `envvars`. Compose aplica `user: "1000:1000"` + `cap_add: [NET_BIND_SERVICE]`. Testado: `docker compose exec app id` → `uid=1000(app)`; Apache/PHP rodam como `app`; stack sobe e responde HTTP 200.
 
 ---
 
@@ -84,7 +84,7 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
   ```
   Com `read_only: true`, garantir que `fotos_visitantes` e `php_errors.log` estejam em volumes graváveis. Em modo de produção, a rotação de logs do Apache precisa de volume ou `ApaLogs` em `/dev/stdout`.
 - **Testes:** `docker inspect <container> | grep -i cap`; validar upload e login.
-- **Status:** Aberto.
+- **Status:** Validado. Compose do `app` aplica `security_opt: no-new-privileges`, `cap_drop: [ALL]` (com `cap_add: [NET_BIND_SERVICE]` para bind da porta 80), `read_only: true` e `tmpfs` para `/tmp`, `/var/run/apache2` e `/var/lock/apache2`. `apache.conf` e `php.ini` passam a logar em `/proc/self/fd/{1,2}` (capturado pelo Docker). Stack testada com upload e HTTP 200.
 
 ---
 
@@ -161,7 +161,7 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
       internal: true
   ```
   `app` em `frontend` + `backend`; `db` somente em `backend` (internal).
-- **Status:** Aberto.
+- **Status:** Validado. Redes `frontend` (bridge) e `backend` (`internal: true`). `app` em ambas; `db` somente em `backend`; phpMyAdmin (dev) em `frontend`+`backend` para alcançar o banco e ser acessível no host. Validado via `docker network inspect`.
 
 ---
 
@@ -282,9 +282,9 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
 7. SEC-DOCKER-003: adicionar limites de recursos.
 
 ### Fase 1 — Hardening Docker
-1. SEC-DOCKER-001: usuário não-root.
-2. SEC-DOCKER-002: `cap_drop`, `no-new-privileges`, `read_only`, `tmpfs`.
-3. SEC-DOCKER-007: redes internas para o banco.
+1. ~~SEC-DOCKER-001: usuário não-root.~~ Validado.
+2. ~~SEC-DOCKER-002: `cap_drop`, `no-new-privileges`, `read_only`, `tmpfs`.~~ Validado.
+3. ~~SEC-DOCKER-007: redes internas para o banco.~~ Validado.
 
 ### Fase 2 — Autenticação e Sessões
 1. SEC-SESS-001: expiração/revogação de sessões na tabela.
@@ -314,6 +314,25 @@ Data de execução: 2026-08-19.
 | SEC-DOCKER-003 | `mem_limit`/`cpus`/`pids_limit` em `app` e `db` | `docker compose config` OK |
 
 Correções adicionais de higiene (fora dos achados): chave `command:` duplicada removida em `docker-compose.yml`; falsos positivos do LSP eliminados em `scripts/logout.php` e `scripts/editarUsuario.php` (casts `(int)`/`(string)` → `intval()`/`strval()`).
+
+Validação da suíte: `vendor/bin/phpunit` → 114 testes, 129 asserções OK.
+
+### Fase 1 — Registro de Execução
+
+Data de execução: 2026-08-19.
+
+| ID | Correção | Validação |
+|---|---|---|
+| SEC-DOCKER-001 | Dockerfile: usuário `app` (1000:1000), `USER app`, `WORKDIR`, `APACHE_RUN_USER/GROUP=app`; compose `user: 1000:1000` + `cap_add: NET_BIND_SERVICE` | Build OK; `docker exec id` → `uid=1000(app)`; Apache/PHP como `app`; HTTP 200 |
+| SEC-DOCKER-002 | `no-new-privileges`, `cap_drop: [ALL]`, `read_only: true`, `tmpfs` (`/tmp`, `/var/run/apache2`, `/var/lock/apache2`); logs Apache/PHP → `/proc/self/fd/{1,2}` | Stack sobe; upload e login validados; HTTP 200 |
+| SEC-DOCKER-007 | Redes `frontend` (pública) + `backend` (`internal: true`); `db` só em `backend` | `docker network inspect`: `backend` internal com app+db; `frontend` só app; pma dev em ambas |
+
+Nota: `phpMyAdmin` no override de dev ficou em `frontend`+`backend` porque, neste ambiente Docker, portas publicadas não são expostas em redes `internal` — ele precisa do `backend` para alcançar o banco e do `frontend` para ser alcançado pelo host.
+
+Correções adicionais descobertas durante a validação da Fase 1 (bugs pré-existentes que impediam a stack Docker de funcionar):
+
+- **Falta de `composer install` no Dockerfile:** `.dockerignore` excluía `vendor/`, o Dockerfile nunca instalava dependências e ainda removia `vendor/` em produção — a imagem resultante era 500 (sem `vendor/autoload.php`). Corrigido: `composer install` no build (com `--no-dev` em produção, removendo `composer` depois) e `vendor/` deixou de ser apagado. Validação: build prod OK; `vendor/autoload.php` presente na imagem prod; app dev e prod HTTP 200.
+- **BOM UTF-8 (`EF BB BF`) em 6 arquivos PHP** (`public/index.php`, `scripts/login.php`, `scripts/editarUsuario.php`, `scripts/logout.php`, `inc/footer.php`, `api/session_check.php`): o BOM emitia output antes de `configureSessionSecurity()`, anulando `session_name()`/`ini_set()` da sessão — o cookie `__Host-SID` da Fase 0 (SEC-COOKIE-001) **nunca era aplicado** e o warning `session_name(): Session name cannot be changed after headers have already been sent` aparecia em toda requisição. Corrigido: BOMs removidos. Validação: login E2E OK (302 → trocar_senha), cookie de sessão emitido, zero warnings PHP nos logs.
 
 Validação da suíte: `vendor/bin/phpunit` → 114 testes, 129 asserções OK.
 
