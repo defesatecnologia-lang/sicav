@@ -8,6 +8,9 @@
     <testsuite name="Validators">
       <file>tests/ValidatorsTest.php</file>
     </testsuite>
+    <testsuite name="LoginSecurity">
+      <file>tests/LoginSecurityTest.php</file>
+    </testsuite>
     <testsuite name="Helpers">
       <file>tests/HelpersTest.php</file>
     </testsuite>

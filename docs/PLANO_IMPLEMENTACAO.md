@@ -357,6 +357,48 @@ Configuração exigida: `VISITORPASS_MFA_KEY` (64 hex chars = 32 bytes) para cri
 
 Validação da suíte: `vendor/bin/phpunit` → 114 testes, 129 asserções OK.
 
+### Fase 3 — Registro de Execução
+
+Data de execução: 2026-08-19.
+
+| ID | Validação | Resultado |
+|---|---|---|
+| SEC-AUTH-001 | Brute force: 5 falhas bloqueiam por 15 min (`login_attempts`, `MAX_LOGIN_ATTEMPTS=5`, `MAX_IP_LOGIN_ATTEMPTS=15` por IP) | **Bug corrigido — ver abaixo.** Após fix, 5 falhas → `user:5:<lock_until>`; 6ª tentativa com senha correta → bloqueada (redirect `index.php?page=login` + mensagem "Acesso temporariamente bloqueado"); LOGIN_FAILURE/account_locked auditados. |
+| SEC-AUTH-002 | Session fixation: `session_regenerate_id(true)` em `finalizeLoginSession()` | **Validado** — session_id trocado após login (ex.: `fb0d…` → `630309…`); sessão antiga destruída no servidor (`session_regenerate_id(true)`); cookie atualizado. |
+| SEC-AUTHZ-001 | IDOR/BOLA em rotas API e admin | **Bug corrigido — ver abaixo (SEC-AUTHZ-001).** Após fix: user→`api_estatisticas`/`exportar_auditoria` 403; supervisor→`get_auditoria` 403, `api_estatisticas` 200; admin (pós-MFA)→rotas admin 200; eventos `AUTHORIZATION_DENIED` auditados. IDOR em `api_detalhes`/`reactivate_visitor`/`get_photo`: by-design (dados de visitante são compartilhados, sem modelo de ownership; `vid` é `(int)`). |
+| SEC-WEB-001 | SQLi / XSS / CSRF / path traversal | **Validado** — SQLi: todos os acessos via prepared statements (`:param`), probes (`' OR 1=1--`, `UNION`, `DROP TABLE`) sem bypass e sem erro DB; XSS: entradas exibidas com `htmlspecialchars(ENT_QUOTES)` (ex.: `scripts/login.php:141`), payload `<script>alert(1)</script>` não refletido; CSRF: token obrigatório em POST (`validateCsrfToken`), sem token → rejeitado (HTTP 419/403 — ver bug SEC-WEB-001 abaixo); path traversal: `get_photo` usa `(int)$vid` e `isValidImage()` (`getimagesize`), `foto_caminho` gerado no servidor. |
+| SEC-FILE-001 | Upload inválido/executável; download sem autorização | **Validado** — upload exige `data:image/...;base64`, valida `getimagesizefromstring`, MIME×extensão conferem (jpg≠gif rejeitado), nome de arquivo gerado no servidor (`visitante_<uniqid>_<time>.<ext>`), tamanho ≤ 5 MB; shell PHP disfarçado de JPEG rejeitado ("Conteudo de imagem invalido"); poliglota JPEG+PHP aceito mas **inerte** (extensão `.jpeg` — handler PHP só casa `\.php$` —, fora do docroot, servido via `readfile()` com `Content-Type: image/jpeg`); acesso direto bloqueado (403). |
+| SEC-DOCKER-008 | Container: usuário, capabilities, ports | **Validado (revalidação)** — Apache/PHP rodam como `app` (uid 1000); filesystem `read_only` (escrita falha fora de `fotos_visitantes`); `cap_drop: ALL` + `NET_BIND_SERVICE`; `no-new-privileges`; `mem_limit/cpus/pids_limit`; `db` sem porta publicada (só rede interna); porta pública: 8080 (app). |
+
+**Bug de segurança encontrado (SEC-AUTH-001): timezone incoerente entre PHP e MySQL.**
+
+- **Sintoma:** após 5 falhas de login, a 6ª tentativa com a senha correta autenticava (deveria estar bloqueada).
+- **Causa raiz:** `registerLoginFailure()` grava `lock_until` com `date('Y-m-d H:i:s', time()+900)` em hora local do PHP (`America/Sao_Paulo`, ex.: `18:45:17`), mas `cleanupOldLoginAttempts()` compara com `NOW()` do MySQL, que roda em UTC (ex.: `21:30:17`). Como `18:45 < 21:30`, a linha bloqueada era **apagada na tentativa seguinte**, contornando o bloqueio. O mesmo desalinhamento afetava `expires_at` de sessões (`isUniqueSessionValid`/`purgeExpiredSessions`, sessões viviam +3h) e `window_started_at` do rate limit.
+- **Correção:** `src/Database.php` agora executa `SET time_zone = :offset` (`date('P')`, ex. `-03:00`) em toda conexão; `docker/migrate.php` aplica o mesmo. Assim `NOW()`/`CURRENT_TIMESTAMP`/`FROM_UNIXTIME` ficam coerentes com `date()`/`strtotime()` do PHP.
+- **Validação:** E2E reexecutado — 5 falhas → lock gravado; 6ª tentativa com senha correta → bloqueada com mensagem; login normal ainda funciona (302 → trocar_senha).
+
+**Bug de segurança encontrado (SEC-AUTHZ-001): BOLA nas rotas de API.**
+
+- **Sintoma:** qualquer usuário autenticado (nível `user`) acessava endpoints de API restritos (estatísticas, auditoria).
+- **Causa raiz:** `apiRequireEndpointAccess()` derivava o endpoint via `basename($_SERVER['SCRIPT_NAME'], '.php')`, que sob o roteador (`index.php?page=api/…`) é sempre `index` — fora do mapa de `config/permissions.php`, caía no fallback `'user'`. Todas as APIs eram tratadas como acesso de usuário comum.
+- **Correção:** `inc/api_bootstrap.php` agora extrai o endpoint de `$_GET['page']` (remove prefixo `api/`), com fallback para `SCRIPT_NAME` se vazio.
+- **Validação:** E2E — user→`api_estatisticas`/`exportar_auditoria` 403; supervisor→`get_auditoria` 403, `api_estatisticas` 200; admin→rotas admin 200; `AUTHORIZATION_DENIED` auditados.
+
+**Achado menor (SEC-WEB-001): status 419 não padrão reescrito para 500 pelo Apache.**
+
+- **Sintoma:** rejeição de CSRF devolvia `{"success":false,"error":"CSRF token invalido"}` com HTTP 500 no cliente, embora o access log do Apache registrasse 419.
+- **Causa raiz:** `http_response_code(419)` (código não padrão) é reescrito pelo Apache/mod_php para 500 no envio ao cliente (códigos padrão 401/403/429 passam corretamente).
+- **Correção:** rejeição de CSRF agora usa HTTP 403 em `src/Middleware/CsrfMiddleware.php`, `inc/api_bootstrap.php` (`apiRequireCsrf`) e `api/renovar_sessao.php`. O controle de segurança continuava funcionando (requisição negada, sem efeito colateral); 403 é semântico e passa pelo Apache.
+- **Validação:** POST sem token → `HTTP/1.1 403 Forbidden` + `{"success":false,"error":"CSRF token invalido"}`; Apache loga 403; login normal continua funcionando (302 → trocar_senha).
+
+**Achado menor (SEC-DOCKER-009): phpMyAdmin de dev ativo em ambiente de produção.**
+
+- **Sintoma:** `visitantes-pma` (phpMyAdmin 5.2) publicado em `0.0.0.0:8081` — o override `docker-compose.dev.yml` foi aplicado no ambiente atual (`VISITORPASS_ENV=production`), contrariando a nota "NAO utilizar em producao" do próprio arquivo.
+- **Correção:** parar/remover o serviço (ex.: `docker compose -f docker-compose.yml up -d app db` sem o override de dev; `docker rm -f visitantes-pma`).
+- **Validação:** pma exige login (cookie auth); mesmo assim a superfície de ataque extra não deve permanecer em produção.
+
+Validação da suíte: `vendor/bin/phpunit` → 121 testes, 148 asserções OK.
+
 ---
 
 ## 5. Definition of Done

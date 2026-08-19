@@ -21,6 +21,13 @@ class Database
                 PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
             ]
         );
+
+        // Alinha o timezone da sessao MySQL ao do PHP para que NOW()/CURRENT_TIMESTAMP
+        // sejam coerentes com date()/strtotime() do PHP. Sem isso, datas escritas por
+        // PHP (ex.: lock_until do brute force) e comparadas com NOW() no banco ficam
+        // deslocadas pelo offset de fuso, quebrando logicas de expiracao/bloqueio.
+        $offset = date('P');
+        $this->pdo->exec("SET time_zone = " . $this->pdo->quote($offset));
     }
 
     public function setUsuarioAuditoria(int $usuarioId): void

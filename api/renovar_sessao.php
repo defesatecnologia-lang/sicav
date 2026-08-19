@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? null);
 if (!validateCsrfToken($csrfToken)) {
-    apiError('CSRF token invalido', 419);
+    apiError('CSRF token invalido', 403);
 }
 
 $tempo_maximo = SESSION_TIMEOUT;

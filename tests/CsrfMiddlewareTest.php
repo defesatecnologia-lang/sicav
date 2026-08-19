@@ -53,7 +53,7 @@ class CsrfMiddlewareTest extends TestCase
         $middleware = new CsrfMiddleware();
 
         $this->expectException(HttpException::class);
-        $this->expectExceptionCode(419);
+        $this->expectExceptionCode(403);
 
         $middleware->handle(fn() => 'should-not-reach');
     }
@@ -64,7 +64,7 @@ class CsrfMiddlewareTest extends TestCase
         $middleware = new CsrfMiddleware();
 
         $this->expectException(HttpException::class);
-        $this->expectExceptionCode(419);
+        $this->expectExceptionCode(403);
 
         $middleware->handle(fn() => 'should-not-reach');
     }
@@ -77,7 +77,7 @@ class CsrfMiddlewareTest extends TestCase
         $middleware = new CsrfMiddleware();
 
         $this->expectException(HttpException::class);
-        $this->expectExceptionCode(419);
+        $this->expectExceptionCode(403);
 
         $middleware->handle(fn() => 'should-not-reach');
     }

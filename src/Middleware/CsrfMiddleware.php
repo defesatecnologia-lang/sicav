@@ -11,7 +11,7 @@ class CsrfMiddleware implements MiddlewareInterface
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? null);
             if (!validateCsrfToken($token)) {
-                throw new HttpException(419, json_encode(['success' => false, 'error' => 'CSRF token invalido']));
+                throw new HttpException(403, json_encode(['success' => false, 'error' => 'CSRF token invalido']));
             }
         }
 

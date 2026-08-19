@@ -15,6 +15,9 @@ try {
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
     ]);
 
+    // Alinha o timezone da sessao ao do PHP (mesmo comportamento de src/Database.php)
+    $pdo->exec("SET time_zone = " . $pdo->quote(date('P')));
+
     $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$dbname}` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
     $pdo->exec("USE `{$dbname}`");
 
