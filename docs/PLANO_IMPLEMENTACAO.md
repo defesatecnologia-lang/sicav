@@ -291,7 +291,7 @@ Os achados abaixo são as lacunas **confirmadas** entre a especificação e o es
 2. ~~SEC-RATE-001: rate limiting genérico.~~ Validado.
 3. ~~SEC-HDR-001: HSTS + TLS no proxy (produção).~~ Validado (HSTS no app; TLS depende do proxy).
 4. ~~SEC-LOG-001: eventos estruturados + request_id.~~ Validado.
-5. ~~SEC-MFA-001: TOTP para admins (esforço alto, planejar isoladamente).~~ Validado.
+5. ~~SEC-MFA-001: TOTP implementado (esforço alto).~~ Validado — obrigatoriedade para admins fica em aberto (decisão de política, ver §6).
 
 ### Fase 3 — Validação e Testes de Segurança
 - Executar testes obrigatórios da especificação (§62): autenticação (brute force, session fixation), autorização (IDOR/BOLA), web (SQLi, XSS, CSRF, path traversal), arquivos (upload inválido, executável, download sem autorização), container (usuário, capabilities, ports).
@@ -430,6 +430,6 @@ Para cada achado, antes de declarar concluído:
 ## 6. Limitações
 
 - Ambiente de produção não acessível; validação limitada ao Docker local.
-- MFA (SEC-MFA-001): implementado com TOTP para todos os usuários autenticados (menu do usuário); exigir para admins é decisão de política.
+- MFA (SEC-MFA-001): implementado com TOTP para todos os usuários autenticados (menu do usuário); **exigir MFA obrigatório para admins fica em aberto — decisão de política a ser tomada pela equipe/stakeholders (impacto: exigência da §12 depende dessa decisão).**
 - TLS/HSTS (SEC-HDR-001) dependem do reverse proxy em produção (fora do repositório); HSTS é emitido pelo app quando a requisição é HTTPS.
 - Análise de performance e testes E2E não executados nesta etapa (registrados como "Não auditado").
