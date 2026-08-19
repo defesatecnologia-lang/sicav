@@ -70,7 +70,7 @@ try {
         }
 
         // Hash da senha
-        $senhaHash = password_hash($user['password'], PASSWORD_BCRYPT, ['cost' => 10]);
+        $senhaHash = password_hash($user['password'], PASSWORD_ARGON2ID);
 
         // Inserir usuário
         $insertResult = $db->insert(

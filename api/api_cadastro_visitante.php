@@ -150,14 +150,14 @@ try {
         ':original_id' => $data->original_id ?? null,
     ];
 
-    $result = $db->select($sql, $params);
+    $result = $db->insert($sql, $params);
     if ($result['status'] !== 'success') {
         throw new Exception('Erro ao inserir no banco de dados');
     }
 
     apiJsonResponse([
         'success' => true,
-        'id' => $result['insert_id'],
+        'id' => $result['insert_id'] ?? null,
         'message' => 'Visitante cadastrado com sucesso!',
         'foto_salva' => $fotoPath !== null,
     ]);

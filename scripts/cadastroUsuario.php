@@ -39,7 +39,7 @@ function inserirUsuario($dbConn) {
                 exit;
             }
 
-            $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
+            $senha_hash = password_hash($senha, PASSWORD_ARGON2ID);
 
             $sql = "INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, senha_temporaria) VALUES (:nome, :usuario, :senha, :nivel_acesso, 1)";
             $params = [

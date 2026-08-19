@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
         if (!$hashAtual || !password_verify($senha_atual, $hashAtual)) {
             $_SESSION['erro_troca_senha'] = 'Senha atual incorreta!';
         } else {
-            $senha_hash = password_hash($nova_senha, PASSWORD_DEFAULT);
+            $senha_hash = password_hash($nova_senha, PASSWORD_ARGON2ID);
             $sql = "UPDATE usuarios SET senha = :senha, senha_temporaria = 0 WHERE id = :id";
             $params = [
                 ':senha' => $senha_hash,

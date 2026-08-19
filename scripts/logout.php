@@ -33,7 +33,8 @@ header('Pragma: no-cache');
 header('Expires: Wed, 11 Jan 1984 05:00:00 GMT');
 
 // Preserva o motivo do encerramento para a tela de login.
-$isTimeout = isset($_GET['timeout']) && (int) $_GET['timeout'] === 1;
+$timeoutParam = $_GET['timeout'] ?? null;
+$isTimeout = $timeoutParam !== null && intval($timeoutParam) === 1;
 $redirectQuery = $isTimeout ? 'timeout=1' : 'logout=1';
 header('Location: ' . rtrim($GLOBALS['APP_PUBLIC_PATH'] ?? '/public', '/') . '/index.php?page=login&' . $redirectQuery);
 exit;

@@ -58,12 +58,15 @@ mysql -u root -p < db/visitorpass.sql
 # Copie o arquivo de exemplo
 cp .env.example.docker .env
 
-# Inicie os containers
+# Inicie os containers (sem phpMyAdmin)
 docker compose up -d
+
+# Para incluir o phpMyAdmin (somente desenvolvimento):
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Acesse:
 # - App: http://localhost:8080
-# - phpMyAdmin: http://localhost:8081
+# - phpMyAdmin (apenas via override de dev): http://localhost:8081
 ```
 
 ### Produção
@@ -73,9 +76,12 @@ docker compose up -d
 vim .env
 # Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD
 
-# Build e inicie
+# Build e inicie (phpMyAdmin e porta do MySQL NAO sao publicados em producao)
 docker compose up -d --build
 ```
+
+O banco de dados não expõe porta no host. Acessos administrativos devem ser feitos via
+`docker compose exec db mysql -u root -p` ou pela rede interna.
 
 ## Usuários padrão (Docker)
 
@@ -105,6 +111,7 @@ sistema-visitantes-v1.0/
 ├── vendor/           # Dependências Composer
 ├── Dockerfile        # Build da imagem PHP
 ├── docker-compose.yml
+├── docker-compose.dev.yml  # Override de desenvolvimento (phpMyAdmin)
 └── .env.example
 ```
 

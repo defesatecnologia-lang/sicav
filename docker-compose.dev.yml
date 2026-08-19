@@ -1,0 +1,25 @@
+# Override para desenvolvimento: adiciona phpMyAdmin.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# NAO utilizar em producao.
+services:
+  phpmyadmin:
+    image: phpmyadmin:5.2
+    container_name: visitantes-pma
+    ports:
+      - "${PMA_PORT:-8081}:80"
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+      UPLOAD_LIMIT: 50M
+    depends_on:
+      - db
+    restart: unless-stopped
+    networks:
+      - visitantes-net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    mem_limit: 256m
+    pids_limit: 128

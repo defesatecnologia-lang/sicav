@@ -15,8 +15,8 @@ function registrarAuditoriaResetSenha(database $dbConn, int $adminId, object $us
 {
     $dadosNovos = json_encode([
         'evento' => 'RESET_SENHA_TEMPORARIA',
-        'usuario_alvo_id' => (int)($usuarioAlvo->id ?? 0),
-        'usuario_alvo_login' => (string)($usuarioAlvo->usuario ?? ''),
+        'usuario_alvo_id' => intval($usuarioAlvo->id ?? 0),
+        'usuario_alvo_login' => strval($usuarioAlvo->usuario ?? ''),
         'executado_por_usuario_id' => $adminId,
     ], JSON_UNESCAPED_UNICODE);
 
@@ -24,14 +24,15 @@ function registrarAuditoriaResetSenha(database $dbConn, int $adminId, object $us
         "INSERT INTO auditoria_visitantes (tabela, registro_id, acao, dados_novos, usuario_id, data_acao)
         VALUES ('usuarios', :registro_id, 'UPDATE', :dados_novos, :usuario_id, NOW())",
         [
-            ':registro_id' => (int)($usuarioAlvo->id ?? 0),
+            ':registro_id' => intval($usuarioAlvo->id ?? 0),
             ':dados_novos' => $dadosNovos,
             ':usuario_id' => $adminId,
         ]
     );
 }
 
-$id_usuario = isset($_GET['id']) ? (int)$_GET['id'] : null;
+$idParam = $_GET['id'] ?? null;
+$id_usuario = $idParam !== null ? intval($idParam) : null;
 
 if (!$id_usuario || $id_usuario <= 0) {
     header('Location: index.php?page=listarUsuario');
@@ -76,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
         } else {
             if ($redefinir_senha) {
                 $novaSenhaTemporaria = gerarSenhaTemporariaSegura();
-                $senha_temporaria = password_hash($novaSenhaTemporaria, PASSWORD_DEFAULT);
+                $senha_temporaria = password_hash($novaSenhaTemporaria, PASSWORD_ARGON2ID);
                 $sql_update = "UPDATE usuarios SET nome = :nome, usuario = :usuario, nivel_acesso = :nivel_acesso, ativo = :ativo, senha = :senha, senha_temporaria = 1 WHERE id = :id";
                 $params_update = [
                     ':nome' => $nome,
@@ -108,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
                 
                 if ($redefinir_senha) {
                     $senhaTemporariaModal = $novaSenhaTemporaria;
-                    $adminId = (int)($_SESSION['usuario']->id ?? 0);
+                    $adminId = intval($_SESSION['usuario']->id ?? 0);
                     if ($adminId > 0) {
                         registrarAuditoriaResetSenha($db, $adminId, $usuario);
                     }

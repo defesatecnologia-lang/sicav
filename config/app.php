@@ -33,18 +33,25 @@ function isHttpsRequest(): bool
     return false;
 }
 
+function sessionCookieName(): string
+{
+    return isHttpsRequest() ? '__Host-SID' : 'PHPSESSID';
+}
+
 function configureSessionSecurity(): void
 {
     if (session_status() !== PHP_SESSION_NONE) {
         return;
     }
 
+    $secureCookie = isHttpsRequest();
+    $sameSite = $secureCookie ? 'Strict' : 'Lax';
+
+    session_name(sessionCookieName());
     ini_set('session.use_only_cookies', '1');
     ini_set('session.use_strict_mode', '1');
     ini_set('session.cookie_httponly', '1');
-    ini_set('session.cookie_samesite', 'Lax');
-
-    $secureCookie = isHttpsRequest();
+    ini_set('session.cookie_samesite', $sameSite);
     ini_set('session.cookie_secure', $secureCookie ? '1' : '0');
 
     session_set_cookie_params([
@@ -52,6 +59,6 @@ function configureSessionSecurity(): void
         'path' => '/',
         'secure' => $secureCookie,
         'httponly' => true,
-        'samesite' => 'Lax',
+        'samesite' => $sameSite,
     ]);
 }
