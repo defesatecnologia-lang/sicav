@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+#
+# Setup automatico do sistema em Docker:
+#   1. Cria .env a partir do exemplo se nao existir
+#   2. Build das imagens
+#   3. Sobe os containers (app + db)
+#   4. Espera o banco ficar saudavel
+#   5. Verifica que os usuarios padrao (admin/supervisor) foram criados
+#
+# Uso:
+#   ./scripts/setup_docker.sh            # setup completo
+#   ./scripts/setup_docker.sh --build    # forca rebuild das imagens
+#   ./scripts/setup_docker.sh --reset    # remove volumes e recria do zero
+#
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+COMPOSE="docker compose"
+ARGS=()
+RESET=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --build) ARGS+=(--build) ;;
+        --reset) RESET=1 ;;
+        *) echo "Argumento desconhecido: $arg" >&2; exit 1 ;;
+    esac
+done
+
+if [ ! -f .env ]; then
+    echo "--> Criando .env a partir de .env.example.docker..."
+    cp .env.example.docker .env
+else
+    echo "--> .env ja existe, mantendo."
+fi
+
+if [ "$RESET" = "1" ]; then
+    echo "--> Reset: removendo containers e volumes..."
+    $COMPOSE down -v --remove-orphans
+fi
+
+echo "--> Build das imagens..."
+$COMPOSE build ${ARGS[*]:-}
+
+echo "--> Subindo containers..."
+$COMPOSE up -d ${ARGS[*]:-}
+
+echo "--> Aguardando banco de dados ficar saudavel..."
+for i in $(seq 1 60); do
+    status=$($COMPOSE ps db --format '{{.Status}}' 2>/dev/null || true)
+    if echo "$status" | grep -qi healthy; then
+        echo "    Banco de dados: healthy"
+        break
+    fi
+    if [ "$i" = "60" ]; then
+        echo "ERRO: banco de dados nao ficou saudavel em 60 tentativas." >&2
+        $COMPOSE logs db --tail 50 >&2
+        exit 1
+    fi
+    sleep 2
+done
+
+echo "--> Aguardando app ficar saudavel..."
+for i in $(seq 1 60); do
+    status=$($COMPOSE ps app --format '{{.Status}}' 2>/dev/null || true)
+    if echo "$status" | grep -qi "Up"; then
+        echo "    App: up"
+        break
+    fi
+    if [ "$i" = "60" ]; then
+        echo "ERRO: app nao subiu em 60 tentativas." >&2
+        $COMPOSE logs app --tail 50 >&2
+        exit 1
+    fi
+    sleep 2
+done
+
+echo "--> Verificando usuarios padrao..."
+USERS=$($COMPOSE exec -T db mysql -u"${VISITORPASS_DB_USER:-vpuser}" -p"${VISITORPASS_DB_PASS:-visitorpassword}" "${VISITORPASS_DB_NAME:-visitorpass}" -N -e \
+    "SELECT usuario, nivel_acesso FROM usuarios ORDER BY id;" 2>/dev/null || true)
+
+echo "$USERS"
+
+if ! echo "$USERS" | grep -q admin; then
+    echo "ERRO: usuario admin nao encontrado no banco." >&2
+    echo "Confira os logs da migracao:" >&2
+    $COMPOSE logs app --tail 30 >&2
+    exit 1
+fi
+
+APP_PORT=$(grep -E '^APP_PORT=' .env | cut -d= -f2 || echo 8080)
+
+echo
+echo "======================================================"
+echo " Setup concluido!"
+echo " Aplicacao: http://localhost:${APP_PORT}"
+echo " Usuarios padrao (alterar no primeiro login):"
+echo "   admin      / Admin@2026Temp!      (nivel admin)"
+echo "   supervisor / Supervisor@2026Temp! (nivel supervisor)"
+echo "======================================================"

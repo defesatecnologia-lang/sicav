@@ -35,13 +35,6 @@ const DEFAULT_USERS = [
         'senha_temporaria' => 1,
     ],
     [
-        'name' => 'User Sistema',
-        'username' => 'user',
-        'password' => 'User@2026Temp!',
-        'nivel_acesso' => 'user',
-        'senha_temporaria' => 1,
-    ],
-    [
         'name' => 'Supervisor Sistema',
         'username' => 'supervisor',
         'password' => 'Supervisor@2026Temp!',

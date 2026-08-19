@@ -82,6 +82,20 @@ vim .env
 docker compose up -d --build
 ```
 
+### Setup automático
+
+```bash
+# Cria .env, builda as imagens, sobe containers, aguarda o banco e
+# verifica que os usuarios padrao (admin/supervisor) foram criados
+./scripts/setup_docker.sh
+
+# Forca rebuild das imagens
+./scripts/setup_docker.sh --build
+
+# Remove volumes e recria do zero (apaga o banco)
+./scripts/setup_docker.sh --reset
+```
+
 O banco de dados não expõe porta no host. Acessos administrativos devem ser feitos via
 `docker compose exec db mysql -u root -p` ou pela rede interna.
 
@@ -93,7 +107,6 @@ Os seguintes usuários são criados automaticamente na primeira execução:
 |---------|-------|-------|
 | admin | Admin@2026Temp! | admin |
 | supervisor | Supervisor@2026Temp! | supervisor |
-| user | User@2026Temp! | user |
 
 **Altere as senhas imediatamente após o primeiro login.**
 

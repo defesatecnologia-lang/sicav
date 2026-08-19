@@ -243,13 +243,10 @@ try {
         $hash = password_hash('Admin@2026Temp!', PASSWORD_ARGON2ID);
         $pdo->prepare("INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, senha_temporaria)
             VALUES ('Administrador Sistema', 'admin', ?, 'admin', 1)")->execute([$hash]);
-        $hash = password_hash('User@2026Temp!', PASSWORD_ARGON2ID);
-        $pdo->prepare("INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, senha_temporaria)
-            VALUES ('User Sistema', 'user', ?, 'user', 1)")->execute([$hash]);
         $hash = password_hash('Supervisor@2026Temp!', PASSWORD_ARGON2ID);
         $pdo->prepare("INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, senha_temporaria)
             VALUES ('Supervisor Sistema', 'supervisor', ?, 'supervisor', 1)")->execute([$hash]);
-        echo "Default users created (admin/user/supervisor). CHANGE PASSWORDS!\n";
+        echo "Default users created (admin/supervisor). CHANGE PASSWORDS!\n";
     }
 
     echo "Migration completed successfully!\n";
