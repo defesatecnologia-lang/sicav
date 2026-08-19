@@ -11,6 +11,15 @@
     <testsuite name="LoginSecurity">
       <file>tests/LoginSecurityTest.php</file>
     </testsuite>
+    <testsuite name="Session">
+      <file>tests/SessionTest.php</file>
+    </testsuite>
+    <testsuite name="ApiPermissions">
+      <file>tests/ApiPermissionsTest.php</file>
+    </testsuite>
+    <testsuite name="FotoUpload">
+      <file>tests/FotoUploadTest.php</file>
+    </testsuite>
     <testsuite name="Helpers">
       <file>tests/HelpersTest.php</file>
     </testsuite>

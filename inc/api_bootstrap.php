@@ -68,11 +68,7 @@ function apiRequireEndpointAccess(): void
 
     // Sob o roteador (index.php?page=api/<endpoint>), SCRIPT_NAME e sempre
     // index.php; o endpoint vem do parametro 'page'.
-    $page = $_GET['page'] ?? '';
-    $endpoint = str_starts_with($page, 'api/') ? substr($page, 4) : $page;
-    if ($endpoint === '') {
-        $endpoint = basename($_SERVER['SCRIPT_NAME'] ?? '', '.php');
-    }
+    $endpoint = resolveApiEndpoint($_GET['page'] ?? '', $_SERVER['SCRIPT_NAME'] ?? '');
 
     $requiredAccess = $map[$endpoint] ?? 'user';
     apiRequireAuth($requiredAccess);

@@ -3,9 +3,9 @@
 require_once __DIR__ . '/../inc/api_bootstrap.php';
 require_once __DIR__ . '/../inc/validators.php';
 require_once __DIR__ . '/../inc/rate_limit.php';
+require_once __DIR__ . '/../inc/foto_helpers.php';
 
 define('FOTOS_DIR', __DIR__ . '/../fotos_visitantes/');
-define('MAX_IMAGE_BYTES', 5 * 1024 * 1024);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     apiError('Metodo invalido', 405);
@@ -71,51 +71,7 @@ try {
         throw new Exception('Placa invalida: use formato padrão (ABC-1234) ou Mercosul (ABC1D23)');
     }
 
-    $fotoPath = null;
-    if (!empty($data->foto)) {
-        $imageData = $data->foto;
-        if (!preg_match('/^data:image\/(\w+);base64,/', $imageData, $type)) {
-            throw new Exception('Formato de imagem base64 invalido');
-        }
-
-        $imageData = substr($imageData, strpos($imageData, ',') + 1);
-        $type = strtolower($type[1]);
-        if (!in_array($type, ['jpg', 'jpeg', 'png', 'gif'], true)) {
-            throw new Exception("Tipo de imagem nao suportado: {$type}");
-        }
-
-        $decoded = base64_decode($imageData, true);
-        if ($decoded === false) {
-            throw new Exception('Falha ao decodificar imagem');
-        }
-        if (strlen($decoded) > MAX_IMAGE_BYTES) {
-            throw new Exception('Imagem excede o tamanho maximo de 5MB');
-        }
-
-        $imgInfo = @getimagesizefromstring($decoded);
-        if ($imgInfo === false || empty($imgInfo['mime'])) {
-            throw new Exception('Conteudo de imagem invalido');
-        }
-        $mimeToExt = [
-            'image/jpeg' => 'jpeg',
-            'image/png' => 'png',
-            'image/gif' => 'gif',
-        ];
-        $realExt = $mimeToExt[strtolower((string)$imgInfo['mime'])] ?? null;
-        if ($realExt === null) {
-            throw new Exception('Tipo MIME de imagem nao suportado');
-        }
-        if ($realExt !== $type && !($realExt === 'jpeg' && $type === 'jpg')) {
-            throw new Exception('Extensao de imagem nao confere com o conteudo');
-        }
-
-        $nomeArquivo = 'visitante_' . uniqid('', true) . '_' . time() . '.' . $type;
-        $caminhoCompleto = FOTOS_DIR . $nomeArquivo;
-        if (file_put_contents($caminhoCompleto, $decoded) === false) {
-            throw new Exception('Falha ao salvar arquivo de imagem');
-        }
-        $fotoPath = 'fotos_visitantes/' . $nomeArquivo;
-    }
+    $fotoPath = salvarFotoBase64((string) ($data->foto ?? ''), FOTOS_DIR);
 
     $cpf = preg_replace('/\D/', '', (string) $data->cpf);
     $placa = !empty($data->placa) ? preg_replace('/[^A-Za-z0-9]/', '', strtoupper((string) $data->placa)) : null;

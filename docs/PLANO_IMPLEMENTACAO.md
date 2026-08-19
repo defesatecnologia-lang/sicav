@@ -399,6 +399,16 @@ Data de execução: 2026-08-19.
 
 Validação da suíte: `vendor/bin/phpunit` → 121 testes, 148 asserções OK.
 
+**Testes automatizados adicionados (login/sessão/upload/autorização).**
+
+- `tests/LoginSecurityTest.php` (7 testes): `getLoginAttempt`, `registerLoginFailure` (lock no máximo), `clearLoginAttempts`, `cleanupOldLoginAttempts`.
+- `tests/SessionTest.php` (13 testes): token aleatório, hash SHA-256, `registerUniqueSession`/`invalidateUniqueSession`, `isUniqueSessionValid` (ativa/expirada/inativa/revogada/token divergente), `purgeExpiredSessions`, `finalizeLoginSession` (regenera session_id, não persiste hash de senha).
+- `tests/ApiPermissionsTest.php` (8 testes): `resolveApiEndpoint` (rota via `page`, fallback via `SCRIPT_NAME`), mapa de `config/permissions.php` cobre todos os endpoints de `api/`, níveis válidos, endpoints supervisor/admin restritos, fallback `user`.
+- `tests/FotoUploadTest.php` (10 testes): PNG válido salvo com caminho relativo e nome controlado pelo servidor; shell disfarçado de JPEG e poliglota rejeitados; extensão×conteúdo conferido; base64 inválido; tipo não suportado; tamanho excedente; vazio → `null`.
+- Refator associado: validação de upload extraída de `api/api_cadastro_visitante.php` para `inc/foto_helpers.php` (`salvarFotoBase64`); `resolveApiEndpoint` movido para `inc/security.php`.
+
+Validação: `vendor/bin/phpunit` → 153 testes, 240 asserções OK; E2E de upload (com e sem foto) validado após o rebuild.
+
 ---
 
 ## 5. Definition of Done

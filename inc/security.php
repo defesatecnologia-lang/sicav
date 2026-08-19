@@ -51,3 +51,12 @@ function userHasAccess(string $required = 'user'): bool
     $userLevel = $_SESSION['usuario']->nivel_acesso ?? 'user';
     return ($levels[$userLevel] ?? 0) >= ($levels[$required] ?? 1);
 }
+
+function resolveApiEndpoint(string $page, ?string $scriptName): string
+{
+    if ($page !== '') {
+        return str_starts_with($page, 'api/') ? substr($page, 4) : $page;
+    }
+
+    return basename((string) $scriptName, '.php');
+}
