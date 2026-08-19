@@ -27,10 +27,10 @@ node_modules/
 # Uploaded files
 /fotos_visitantes/*
 
-# Database backups
-/db/*.sql
+# Database
 /db/*.backup
 /db/*.sh
+/db/*.sql.bak
 
 # Config
 /config/database.local.php
