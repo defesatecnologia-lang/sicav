@@ -421,10 +421,6 @@ class RelatorioVisitantes {
           this.tabela.clear().rows.add(this.dados).draw();
 
           if (this.dados.length === 0 && !forcarRecarregamento) {
-            this.mostrarMensagem(
-              "Nenhum registro encontrado com os filtros aplicados.",
-              "info"
-            );
           } else if (forcarRecarregamento) {
           }
         } else {
