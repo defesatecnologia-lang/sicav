@@ -44,6 +44,19 @@ RUN set -eux; \
     fi; \
     rm -f /usr/local/bin/composer
 
+# Install Node.js for JS tests
+RUN set -eux; \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
+# Run tests
+RUN set -eux; \
+    if [ "$ENVIRONMENT" != "production" ]; then \
+        vendor/bin/phpunit; \
+        find public/assets/js -name '*.js' -print0 | xargs -0 -n1 node --check; \
+    fi
+
 RUN set -eux; \
     if [ "$ENVIRONMENT" = "production" ]; then \
         rm -f /var/www/html/.env; \
