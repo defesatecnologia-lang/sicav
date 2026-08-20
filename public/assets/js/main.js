@@ -7,7 +7,7 @@ function escapeHtml(value) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
-    .replace(/&#39;/g, "&#39;");
+    .replace(/'/g, "&#39;");
 }
 
 // ✅ HELPER PARA LOG CONDICIONAL (não loga em produção)
