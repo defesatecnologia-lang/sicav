@@ -90,14 +90,6 @@ $current_page = $_GET['page'] ?? 'home';
                         </li>
                         <?php endif; ?>
                         <li>
-                            <a class="dropdown-item" href="?page=admin_mfa">
-                                <i class="fas fa-key me-1"></i>Verificação em Duas Etapas
-                            </a>
-                        </li>
-                        <li>
-                            <hr class="dropdown-divider">
-                        </li>
-                        <li>
                             <a class="dropdown-item" href="?page=logout">
                                 <i class="fas fa-sign-out-alt me-1"></i>Sair
                             </a>

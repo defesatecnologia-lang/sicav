@@ -3,13 +3,25 @@ let currentVisitorId = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, """)
+    .replace(/'/g, "'");
 }
 
+// ✅ HELPER PARA LOG CONDICIONAL (não loga em produção)
+function devLog(...args) {
+  if (!IS_PRODUCTION) console.log(...args);
+}
+
+function devError(...args) {
+  if (!IS_PRODUCTION) console.error(...args);
+}
+
+function devWarn(...args) {
+  if (!IS_PRODUCTION) console.warn(...args);
+}
 
 let isVisitorRegistered = false;
 let currentVisitorData = null;
@@ -289,7 +301,7 @@ function configurarIntegracaoReutilizacao() {
       foto: card.getAttribute("data-foto"), // ✅ ADICIONADO: campo foto
     };
 
-    console.log("✅ Selecionando cadastro para reutilização:", cadastro);
+    devLog("✅ Selecionando cadastro para reutilização:", cadastro);
 
     // Preencher formulário
     document.getElementById("uname").value =
@@ -315,7 +327,7 @@ function configurarIntegracaoReutilizacao() {
 
     // Carregar foto do cadastro anterior via endpoint protegido
     if (cadastro.foto && cadastro.foto !== "N/A" && cadastro.foto !== "" && cadastro.id) {
-      console.log("🖼️ Carregando foto do cadastro anterior:", cadastro.foto);
+      devLog("🖼️ Carregando foto do cadastro anterior:", cadastro.foto);
 
       // Converter a imagem do servidor para base64
       fetch(`../api/get_photo.php?vid=${encodeURIComponent(cadastro.id)}`)
@@ -334,20 +346,20 @@ function configurarIntegracaoReutilizacao() {
               window.visitorSystem.showPhotoPreview();
               showToast("Foto do cadastro anterior carregada!", "success");
             } else {
-              console.error("❌ visitorSystem não encontrado");
+              devError("❌ visitorSystem não encontrado");
             }
           };
           reader.readAsDataURL(blob);
         })
         .catch((error) => {
-          console.error("❌ Erro ao carregar foto:", error);
+          devError("❌ Erro ao carregar foto:", error);
           showToast(
             "Erro ao carregar foto anterior - Capture uma nova foto",
             "warning"
           );
         });
     } else {
-      console.log("ℹ️ Nenhuma foto encontrada no cadastro anterior");
+      devLog("ℹ️ Nenhuma foto encontrada no cadastro anterior");
       showToast("Cadastro carregado - Capture uma nova foto", "info");
     }
 
@@ -472,7 +484,7 @@ class VisitorSystem {
   }
 
   async init() {
-    console.log("🚀 Iniciando VisitorSystem...");
+    devLog("🚀 Iniciando VisitorSystem...");
     try {
       await this.initWebcam();
       this.setupEventListeners();
@@ -481,10 +493,10 @@ class VisitorSystem {
       configurarIntegracaoReutilizacao();
       this.setupReutilizacaoModal();
 
-      console.log("✅ Sistema carregado com sucesso!");
+      devLog("✅ Sistema carregado com sucesso!");
     } catch (error) {
-      console.error("Erro na inicialização:", error);
-      console.log("Erro ao carregar sistema:", error.message);
+      devError("Erro na inicialização:", error);
+      devLog("Erro ao carregar sistema:", error.message);
     }
   }
 
@@ -519,7 +531,7 @@ class VisitorSystem {
       video.srcObject = this.stream;
       this.updateCameraButtons(true);
     } catch (err) {
-      console.error("Erro webcam:", err);
+      devError("Erro webcam:", err);
       this.updateCameraButtons(false);
       showToast("Webcam não acessível - usando foto padrão", "warning");
       this.setDefaultPhoto();
@@ -552,7 +564,7 @@ class VisitorSystem {
     // ✅ CONFIGURAR BOTÃO DE IMPRIMIR NO MODAL DO CRACHÁ
     if (btnImprimirCracha) {
       btnImprimirCracha.addEventListener("click", () => {
-        console.log("🖨️ Imprimindo crachá do modal...");
+        devLog("🖨️ Imprimindo crachá do modal...");
         imprimirCracha();
       });
     }
@@ -726,7 +738,7 @@ class VisitorSystem {
 
       this.exibirResultadosBusca(data, termo);
     } catch (error) {
-      console.error("❌ Erro na busca de reutilização:", error);
+      devError("❌ Erro na busca de reutilização:", error);
       resultadosDiv.innerHTML = `
         <div class="col-12 text-center text-danger py-4">
           Erro ao buscar cadastros. Tente novamente.
@@ -819,7 +831,7 @@ class VisitorSystem {
         if (card && window.selecionarCadastro) {
           window.selecionarCadastro(card);
         } else {
-          console.error("❌ Função selecionarCadastro não encontrada");
+          devError("❌ Função selecionarCadastro não encontrada");
         }
       });
     });
@@ -938,9 +950,9 @@ class VisitorSystem {
 
       // ✅ CONFIGURAR EVENTO DE FECHAMENTO CORRETAMENTE
       const handleHidden = () => {
-        console.log("🔔 Modal fechado - Verificando se deve limpar formulário");
+        devLog("🔔 Modal fechado - Verificando se deve limpar formulário");
         if (this.pendingClearAfterModal) {
-          console.log("🧹 Limpando formulário após fechar modal do crachá");
+          devLog("🧹 Limpando formulário após fechar modal do crachá");
           setTimeout(() => {
             this.limparFormularioCompleto();
             this.pendingClearAfterModal = false;
@@ -957,9 +969,9 @@ class VisitorSystem {
       // ✅ MOSTRAR MODAL
       modal.show();
 
-      console.log("✅ Modal do crachá aberto com sucesso");
+      devLog("✅ Modal do crachá aberto com sucesso");
     } else {
-      console.error("❌ Modal badgeModal não encontrado");
+      devError("❌ Modal badgeModal não encontrado");
     }
   }
 
@@ -1071,11 +1083,11 @@ class VisitorSystem {
 
   // ✅ MÉTODO CORRIGIDO: Mostrar modal do crachá
   mostrarModalCracha(visitorId, data) {
-    console.log("🖨️ Mostrando modal do crachá para ID:", visitorId);
+    devLog("🖨️ Mostrando modal do crachá para ID:", visitorId);
 
     const badgeModalContent = document.getElementById("badgeModalContent");
     if (!badgeModalContent) {
-      console.error("❌ Elemento badgeModalContent não encontrado");
+      devError("❌ Elemento badgeModalContent não encontrado");
       return;
     }
 
@@ -1204,7 +1216,7 @@ class VisitorSystem {
     const encontrar = document.getElementById("meet")?.value?.trim();
     const tipo = document.getElementById("representing")?.value;
 
-    console.log("🔍 VALIDAÇÃO INICIAL:", {
+    devLog("🔍 VALIDAÇÃO INICIAL:", {
       nome,
       cpf,
       encontrar,
@@ -1297,19 +1309,19 @@ class VisitorSystem {
 
       if (currentReusedId) {
         formData.original_id = currentReusedId;
-        console.log(
+        devLog(
           "🎯 INCLUINDO ID ORIGINAL PARA REUTILIZAÇÃO:",
           currentReusedId
         );
       }
 
-      console.log("📤 Enviando dados para API:", formData);
+      devLog("📤 Enviando dados para API:", formData);
 
       if (this.photoData) {
-          console.log("📸 Tamanho da foto:", this.photoData.length);
-          console.log("📸 Tipo da foto:", typeof this.photoData);
+          devLog("📸 Tamanho da foto:", this.photoData.length);
+          devLog("📸 Tipo da foto:", typeof this.photoData);
       } else {
-          console.log("📸 Cadastro sem foto");
+          devLog("📸 Cadastro sem foto");
       }
 
 
@@ -1326,11 +1338,11 @@ class VisitorSystem {
         }
       );
 
-      console.log("📥 Resposta da API - Status:", response.status);
-      console.log("📥 Resposta da API - OK:", response.ok);
+      devLog("📥 Resposta da API - Status:", response.status);
+      devLog("📥 Resposta da API - OK:", response.ok);
 
       const responseText = await response.text();
-      console.log("📥 Resposta da API - Texto COMPLETO:", responseText);
+      devLog("📥 Resposta da API - Texto COMPLETO:", responseText);
 
       let resultado;
 
@@ -1339,7 +1351,7 @@ class VisitorSystem {
         responseText.trim().startsWith("<") ||
         responseText.includes("<br />")
       ) {
-        console.error("❌ API retornando HTML/erro em vez de JSON");
+        devError("❌ API retornando HTML/erro em vez de JSON");
 
         // Extrair mensagem de erro do PHP se possível
         const errorMatch = responseText.match(/<b>(.*?)<\/b>/);
@@ -1352,19 +1364,19 @@ class VisitorSystem {
 
       try {
         resultado = JSON.parse(responseText);
-        console.log("✅ JSON parseado com sucesso:", resultado);
+        devLog("✅ JSON parseado com sucesso:", resultado);
       } catch (parseError) {
-        console.error("❌ Erro ao parsear JSON:", parseError);
+        devError("❌ Erro ao parsear JSON:", parseError);
         throw new Error(
           "Resposta inválida do servidor - formato JSON corrompido"
         );
       }
 
-      console.log("📊 Resultado da API:", resultado);
+      devLog("📊 Resultado da API:", resultado);
 
       if (resultado.success) {
         const newVisitorId = resultado.id;
-        console.log("✅ CADASTRO BEM SUCEDIDO - ID:", newVisitorId);
+        devLog("✅ CADASTRO BEM SUCEDIDO - ID:", newVisitorId);
 
         await showSuccessModal(
           currentReusedId ? "Nova Visita Registrada" : "Cadastro Realizado",
@@ -1375,12 +1387,12 @@ class VisitorSystem {
         // ✅ MOSTRAR CRACHÁ APÓS CADASTRO BEM-SUCEDIDO
         this.mostrarModalCracha(newVisitorId || "temp", formData);
 
-        console.log(
+        devLog(
           "📋 Formulário mantido - será limpo após fechar modal do crachá"
         );
       } else {
         const apiError = resultado.error || resultado.message || "Erro desconhecido";
-        console.error("❌ Erro no resultado da API:", apiError);
+        devError("❌ Erro no resultado da API:", apiError);
 
         if (
           apiError.includes("ativo com este CPF") ||
@@ -1415,7 +1427,7 @@ class VisitorSystem {
         }
       }
     } catch (error) {
-      console.error("❌ Erro no cadastro:", error);
+      devError("❌ Erro no cadastro:", error);
       showErrorModal("Erro no Cadastro", error.message, "error");
     } finally {
       this.isProcessing = false;
@@ -1427,47 +1439,47 @@ class VisitorSystem {
   }
 
   limparFormularioCompleto() {
-    console.log("🧹 INICIANDO LIMPEZA COMPLETA DO FORMULÁRIO");
+    devLog("🧹 INICIANDO LIMPEZA COMPLETA DO FORMULÁRIO");
 
     try {
       // Limpar formulário
       const form = document.getElementById("visitorForm");
       if (form) {
         form.reset();
-        console.log("✅ Formulário resetado");
+        devLog("✅ Formulário resetado");
       }
 
       // Limpar foto
       this.suppressToasts = true;
       this.retakePhoto(false);
       this.suppressToasts = false;
-      console.log("✅ Foto removida");
+      devLog("✅ Foto removida");
 
       // Limpar validações visuais
       document.querySelectorAll(".is-valid, .is-invalid").forEach((el) => {
         el.classList.remove("is-valid", "is-invalid");
       });
-      console.log("✅ Estados de validação limpos");
+      devLog("✅ Estados de validação limpos");
 
       // Limpar reutilização
       limparReutilizacao();
-      console.log("✅ Dados de reutilização limpos");
+      devLog("✅ Dados de reutilização limpos");
 
       // Focar no campo nome
       setTimeout(() => {
         const nomeInput = document.getElementById("uname");
         if (nomeInput) {
           nomeInput.focus();
-          console.log("✅ Foco definido no campo nome");
+          devLog("✅ Foco definido no campo nome");
         }
       }, 300);
 
-      console.log(
+      devLog(
         "🎯 Formulário completamente limpo - PRONTO PARA NOVO CADASTRO"
       );
       showToast("Formulário limpo com sucesso!", "success");
     } catch (error) {
-      console.error("❌ Erro ao limpar formulário:", error);
+      devError("❌ Erro ao limpar formulário:", error);
     }
   }
 

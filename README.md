@@ -110,6 +110,18 @@ Os seguintes usuários são criados automaticamente na primeira execução:
 
 **Altere as senhas imediatamente após o primeiro login.**
 
+## Remoção do MFA (2026-08-20)
+
+A autenticação em duas etapas (MFA/TOTP) foi removida do sistema:
+
+- **scripts/login_submit.php** - Removida verificação `mfaIsEnabled()` após login bem-sucedido
+- **public/index.php** - Removidas rotas `mfa_challenge` e `admin_mfa`
+- **inc/navbar.php** - Removido item "Verificação em Duas Etapas" do menu do usuário
+- **.env** - Variável `VISITORPASS_MFA_KEY` não é mais necessária
+- **docker-compose.yml** - Variável mantida mas sem uso (compatibilidade)
+
+O login agora redireciona diretamente para a página inicial após autenticação válida. Tabelas `usuarios_mfa` e `mfa_recovery_codes` permanecem no banco mas não são mais utilizadas.
+
 ## Estrutura do projeto
 
 ```

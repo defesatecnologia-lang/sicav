@@ -29,13 +29,14 @@ $GLOBALS['APP_PUBLIC_PATH'] = $publicBasePath;
 
 $isProduction = defined('ENVIRONMENT') && ENVIRONMENT === 'production';
 $scriptEvalPolicy = $isProduction ? "" : " 'unsafe-eval'";
+$GLOBALS['IS_PRODUCTION'] = $isProduction;
 $cspNonce = rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '=');
 $GLOBALS['CSP_NONCE'] = $cspNonce;
 
 $cspPolicy = "default-src 'self'; "
     . "script-src 'self' 'nonce-{$cspNonce}'{$scriptEvalPolicy} https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://code.jquery.com https://cdn.datatables.net; "
-    . "style-src 'self' 'nonce-{$cspNonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
-    . "style-src-elem 'self' 'nonce-{$cspNonce}' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
+    . "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
+    . "style-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.datatables.net; "
     . "style-src-attr 'unsafe-inline'; "
     . "img-src 'self' data: blob:; "
     . "font-src 'self' data: https://cdnjs.cloudflare.com; "
@@ -211,13 +212,8 @@ $router->any('nao_autorizado', function () {
     require_once __DIR__ . '/../inc/footer.php';
 });
 
-$router->any('mfa_challenge', function () {
-    require_once __DIR__ . '/../scripts/mfa_challenge.php';
-    exit;
-});
-
 // Rotas com auth user
-$userRoutes = ['home', 'trocar_senha', 'cadastro_visitantes', 'listar_visitantes', 'admin_mfa'];
+$userRoutes = ['home', 'trocar_senha', 'cadastro_visitantes', 'listar_visitantes'];
 foreach ($userRoutes as $route) {
     $router->any($route, function () use ($route) {
         require_once __DIR__ . '/../inc/header.php';

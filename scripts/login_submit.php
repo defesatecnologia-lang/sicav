@@ -91,17 +91,6 @@ clearLoginAttempts($db, GLOBAL_IP_SCOPE, $ipAddress);
 
 logEvent('LOGIN_SUCCESS', ['username' => $usuario_db->usuario]);
 
-require_once __DIR__ . '/../inc/mfa.php';
-
-// Se a conta tem MFA habilitado, exige desafio TOTP antes de concluir o login.
-if (mfaIsEnabled($db, (int) $usuario_db->id)) {
-    $_SESSION['mfa_pending_user_id'] = (int) $usuario_db->id;
-    $_SESSION['mfa_pending_username'] = $usuario_db->usuario;
-    unset($_SESSION['mfa_pending_error']);
-    header('Location: index.php?page=mfa_challenge');
-    exit;
-}
-
 finalizeLoginSession($db, $usuario_db);
 
 if ((int)$usuario_db->senha_temporaria === 1) {

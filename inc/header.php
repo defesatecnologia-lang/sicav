@@ -24,6 +24,7 @@
         // Define a BASE_URL para ser usada em requisições AJAX
         const BASE_URL = '<?= htmlspecialchars(rtrim($GLOBALS['APP_PUBLIC_PATH'] ?? '/public', '/') . '/', ENT_QUOTES, 'UTF-8') ?>';
         const CSRF_TOKEN = '<?= htmlspecialchars(getCsrfToken(), ENT_QUOTES, 'UTF-8') ?>';
+        const IS_PRODUCTION = <?= $GLOBALS['IS_PRODUCTION'] ? 'true' : 'false' ?>;
     </script>
 </head>
 <body class="<?= htmlspecialchars($GLOBALS['body_class'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
