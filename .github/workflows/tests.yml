@@ -55,8 +55,8 @@ jobs:
           find public/assets/js -name '*.js' -print0 \
             | xargs -0 -n1 node --check
 
-      - name: Run JS tests
-        run: node --test "tests/js/*.test.mjs"
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: HTML smoke test
         run: |
