@@ -125,11 +125,11 @@ body {
             <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(getCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
             <div class="mb-3">
                 <label for="text_usuario">Usuário</label>
-                <input type="text" id="text_usuario" name="text_usuario" class="form-control" required>
+                <input type="text" id="text_usuario" name="text_usuario" class="form-control" required autocomplete="username">
             </div>
             <div class="mb-3">
                 <label for="text_senha">Senha</label>
-                <input type="password" id="text_senha" name="text_senha" class="form-control" required>
+                <input type="password" id="text_senha" name="text_senha" class="form-control" required autocomplete="current-password">
             </div>
             <div class="form-group">
                 <input type="submit" value="Entrar" class="btn btn-secondary w-100 mt-2">
