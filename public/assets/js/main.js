@@ -3,11 +3,11 @@ let currentVisitorId = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, """)
-    .replace(/'/g, "'");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/&#39;/g, "&#39;");
 }
 
 // ✅ HELPER PARA LOG CONDICIONAL (não loga em produção)
