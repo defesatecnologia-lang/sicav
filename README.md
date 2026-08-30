@@ -29,6 +29,7 @@ Sistema web para controle de entrada e saída de visitantes com geração de cra
 - MySQL 8.0+
 - Extensões PHP: PDO_MySQL, GD, ZIP, JSON
 - Apache com mod_rewrite
+- Criar a pasta fotos_visitantes na raiz do projeto
 
 ## Instalação local
 
