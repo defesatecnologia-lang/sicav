@@ -25,7 +25,7 @@ vendor/
 node_modules/
 
 # Uploaded files
-/fotos_visitantes/*
+# /fotos_visitantes/*
 
 # Database
 /db/*.backup
