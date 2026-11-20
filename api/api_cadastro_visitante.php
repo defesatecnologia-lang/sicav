@@ -1,0 +1,157 @@
+<?php
+
+require_once __DIR__ . '/../inc/api_bootstrap.php';
+require_once __DIR__ . '/../inc/validators.php';
+require_once __DIR__ . '/../inc/rate_limit.php';
+require_once __DIR__ . '/../inc/foto_helpers.php';
+
+define('FOTOS_DIR', __DIR__ . '/../fotos_visitantes/');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    apiError('Metodo invalido', 405);
+}
+
+apiRequireEndpointAccess();
+apiRequireCsrf();
+
+try {
+    $db = new database();
+    enforceRateLimit($db, 'api_cadastro_visitante', 30, 60);
+} catch (Throwable $e) {
+    logApiException($e, ['context' => 'rate_limit']);
+}
+
+if (!is_dir(FOTOS_DIR) && !mkdir(FOTOS_DIR, 0755, true) && !is_dir(FOTOS_DIR)) {
+    apiError('Falha ao criar diretorio de fotos', 500);
+}
+
+try {
+    $db = new database();
+    $usuarioId = currentUserId();
+    if (!$usuarioId) {
+        throw new Exception('Usuario nao autenticado');
+    }
+    $db->setUsuarioAuditoria($usuarioId);
+
+    $jsonData = apiGetJsonInput();
+    $data = !empty($_POST) ? (object) $_POST : (object) $jsonData;
+    if (empty((array) $data)) {
+        throw new Exception('Dados nao recebidos');
+    }
+
+    $required = ['uname', 'cpf', 'meet', 'representing'];
+    foreach ($required as $field) {
+        if (empty($data->$field)) {
+            throw new Exception("Campo obrigatorio faltando: {$field}");
+        }
+    }
+
+    // Validar nome
+    if (!validateNome($data->uname)) {
+        throw new Exception('Nome invalido: deve ter entre 3 e 255 caracteres');
+    }
+
+    // Validar CPF
+    if (!validateCPF($data->cpf)) {
+        throw new Exception('CPF invalido: verifique o formato e os dígitos verificadores');
+    }
+
+    // Validar email se fornecido
+    if (!empty($data->email) && !validateEmail($data->email)) {
+        throw new Exception('Email invalido: verifique o formato');
+    }
+
+    // Validar telefone se fornecido
+    if (!empty($data->mobileno) && !validateTelefone($data->mobileno)) {
+        throw new Exception('Telefone invalido: use formato brasileiro (11 dígitos com DDD)');
+    }
+
+    // Validar placa se fornecida
+    if (!empty($data->placa) && !validatePlaca($data->placa)) {
+        throw new Exception('Placa invalida: use formato padrão (ABC-1234) ou Mercosul (ABC1D23)');
+    }
+
+    $fotoPath = salvarFotoBase64((string) ($data->foto ?? ''), FOTOS_DIR);
+
+    $cpf = preg_replace('/\D/', '', (string) $data->cpf);
+    $placa = !empty($data->placa) ? preg_replace('/[^A-Za-z0-9]/', '', strtoupper((string) $data->placa)) : null;
+
+    $resultCheck = $db->select(
+        "SELECT id, nome_completo FROM visitorinfo WHERE numero_cpf = :cpf AND status = 1 ORDER BY data_entrada DESC LIMIT 1",
+        [':cpf' => $cpf]
+    );
+    if ($resultCheck['status'] === 'success' && !empty($resultCheck['data'])) {
+        $visitanteAtivo = $resultCheck['data'][0];
+        throw new Exception("Ja existe um visitante ativo com este CPF: {$visitanteAtivo->nome_completo} (ID: {$visitanteAtivo->id})");
+    }
+
+    if ($placa) {
+        $resultCheckPlaca = $db->select(
+            "SELECT id, nome_completo FROM visitorinfo WHERE veiculo_placa = :placa AND status = 1 ORDER BY data_entrada DESC LIMIT 1",
+            [':placa' => $placa]
+        );
+        if ($resultCheckPlaca['status'] === 'success' && !empty($resultCheckPlaca['data'])) {
+            $visitanteAtivo = $resultCheckPlaca['data'][0];
+            throw new Exception("Ja existe um visitante ativo para esta placa: {$visitanteAtivo->nome_completo} (ID: {$visitanteAtivo->id})");
+        }
+    }
+
+    $sql = "INSERT INTO visitorinfo 
+            (nome_completo, numero_cpf, veiculo_placa, telefone, email, empresa, 
+            data_entrada, status, foto_caminho, encontrar_com, tipo_visita, cadastro_original_id) 
+            VALUES (:nome, :cpf, :placa, :telefone, :email, :empresa, NOW(), 1, :foto, :encontrar, :tipo, :original_id)";
+
+    $params = [
+        ':nome' => $data->uname,
+        ':cpf' => $cpf,
+        ':placa' => $placa,
+        ':telefone' => $data->mobileno ?? null,
+        ':email' => $data->email ?? null,
+        ':empresa' => $data->from ?? null,
+        ':foto' => $fotoPath,
+        ':encontrar' => $data->meet,
+        ':tipo' => $data->representing,
+        ':original_id' => $data->original_id ?? null,
+    ];
+
+    $result = $db->insert($sql, $params);
+    if ($result['status'] !== 'success') {
+        throw new Exception('Erro ao inserir no banco de dados');
+    }
+
+    apiJsonResponse([
+        'success' => true,
+        'id' => $result['insert_id'] ?? null,
+        'message' => 'Visitante cadastrado com sucesso!',
+        'foto_salva' => $fotoPath !== null,
+    ]);
+} catch (Exception $e) {
+    $safeMessages = [
+        'Usuario nao autenticado',
+        'Dados nao recebidos',
+        'Formato de imagem base64 invalido',
+        'Falha ao decodificar imagem',
+        'Imagem excede o tamanho maximo de 5MB',
+        'Conteudo de imagem invalido',
+        'Tipo MIME de imagem nao suportado',
+        'Extensao de imagem nao confere com o conteudo',
+        'Falha ao salvar arquivo de imagem',
+        'Erro ao inserir no banco de dados',
+    ];
+    $msg = $e->getMessage();
+    $safe = in_array($msg, $safeMessages, true)
+        || str_starts_with($msg, 'Campo obrigatorio faltando:')
+        || str_starts_with($msg, 'Ja existe um visitante ativo')
+        || str_starts_with($msg, 'Nome invalido:')
+        || str_starts_with($msg, 'CPF invalido:')
+        || str_starts_with($msg, 'Email invalido:')
+        || str_starts_with($msg, 'Telefone invalido:')
+        || str_starts_with($msg, 'Placa invalida:');
+
+    if (!$safe) {
+        logApiException($e);
+        $msg = 'Erro interno ao processar cadastro';
+    }
+
+    apiJsonResponse(['success' => false, 'error' => $msg], $safe ? 400 : 500);
+}

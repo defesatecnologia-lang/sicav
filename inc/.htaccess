@@ -1,0 +1,2 @@
+# Dentro de /config/.htaccess, /scripts/.htaccess, etc.
+Require all denied

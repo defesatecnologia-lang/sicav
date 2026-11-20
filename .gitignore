@@ -1,0 +1,37 @@
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+!.env.example.docker
+
+# OS
+Thumbs.db
+.DS_Store
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Dependencies
+vendor/
+node_modules/
+
+# Static analysis cache
+.psalm-cache/
+
+# Uploaded files
+! /fotos_visitantes/*
+
+# Config
+/config/database.local.php
+
+# Manuais locais (não versionados)
+/manual.md

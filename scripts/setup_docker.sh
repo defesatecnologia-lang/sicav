@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# Setup automatico do sistema em Docker:
+#   1. Cria .env a partir do exemplo se nao existir
+#   2. Build das imagens
+#   3. Sobe os containers (app + nginx + db)
+#   4. Espera o banco ficar saudavel
+#   5. Verifica que o usuario admin foi criado
+#
+# Uso:
+#   ./scripts/setup_docker.sh            # setup completo
+#   ./scripts/setup_docker.sh --build    # forca rebuild das imagens
+#   ./scripts/setup_docker.sh --reset    # remove containers (dados no drive de dados preservados)
+#
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+COMPOSE=(docker compose)
+BUILD_FLAGS=()
+UP_FLAGS=()
+RESET=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --build) BUILD_FLAGS+=(--no-cache); UP_FLAGS+=(--build) ;;
+        --reset) RESET=1 ;;
+        *) echo "Argumento desconhecido: $arg" >&2; exit 1 ;;
+    esac
+done
+
+if [ ! -f .env ]; then
+    echo "--> Criando .env a partir de .env.example.docker..."
+    cp .env.example.docker .env
+    # O exemplo e seguro por padrao (APP_ENV=production). Este script e
+    # exclusivamente de desenvolvimento, entao forca o modo dev no .env gerado.
+    sed -i 's/^APP_ENV=.*/APP_ENV=development/' .env
+else
+    echo "--> .env ja existe, mantendo."
+fi
+
+if [ "$RESET" = "1" ]; then
+    echo "--> Reset: removendo containers e volumes nomeados (dados no drive configurado preservados)..."
+    "${COMPOSE[@]}" down -v --remove-orphans
+fi
+
+echo "--> Build das imagens..."
+"${COMPOSE[@]}" build "${BUILD_FLAGS[@]}"
+
+echo "--> Subindo containers..."
+"${COMPOSE[@]}" up -d "${UP_FLAGS[@]}"
+
+echo "--> Aguardando banco de dados ficar saudavel..."
+for i in $(seq 1 60); do
+    status=$("${COMPOSE[@]}" ps db --format '{{.Status}}' 2>/dev/null || true)
+    if echo "$status" | grep -qi healthy; then
+        echo "    Banco de dados: healthy"
+        break
+    fi
+    if [ "$i" = "60" ]; then
+        echo "ERRO: banco de dados nao ficou saudavel em 60 tentativas." >&2
+        "${COMPOSE[@]}" logs db --tail 50 >&2
+        exit 1
+    fi
+    sleep 2
+done
+
+echo "--> Aguardando app ficar saudavel..."
+for i in $(seq 1 60); do
+    status=$("${COMPOSE[@]}" ps app --format '{{.Status}}' 2>/dev/null || true)
+    if echo "$status" | grep -qi "Up"; then
+        echo "    App: up"
+        break
+    fi
+    if [ "$i" = "60" ]; then
+        echo "ERRO: app nao subiu em 60 tentativas." >&2
+        "${COMPOSE[@]}" logs app --tail 50 >&2
+        exit 1
+    fi
+    sleep 2
+done
+
+echo "--> Verificando usuarios padrao..."
+# As credenciais vivem no .env (lido pelo compose), nao no ambiente do shell:
+# le o arquivo antes de consultar o banco.
+env_from_dotenv() {
+    grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2-
+}
+
+DB_USER=$(env_from_dotenv VISITORPASS_DB_USER)
+DB_USER=${DB_USER:-vpuser}
+DB_NAME=$(env_from_dotenv VISITORPASS_DB_NAME)
+DB_NAME=${DB_NAME:-visitorpass}
+DB_PASS=$(env_from_dotenv VISITORPASS_DB_PASS)
+
+USERS=$("${COMPOSE[@]}" exec -T -e MYSQL_PWD="$DB_PASS" db \
+    mysql -u"$DB_USER" "$DB_NAME" -N -e \
+    "SELECT usuario, nivel_acesso FROM usuarios ORDER BY id;" 2>/dev/null || true)
+
+echo "$USERS"
+
+if ! echo "$USERS" | grep -q admin; then
+    echo "ERRO: usuario admin nao encontrado no banco." >&2
+    echo "Confira os logs da migracao:" >&2
+    "${COMPOSE[@]}" logs app --tail 30 >&2
+    exit 1
+fi
+
+NGINX_PORT=$(grep -E '^NGINX_PORT=' .env | cut -d= -f2 || true)
+NGINX_PORT=${NGINX_PORT:-8000}
+
+APP_ENV=$(grep -E '^APP_ENV=' .env | cut -d= -f2 || true)
+APP_ENV=${APP_ENV:-production}
+
+echo
+echo "======================================================"
+echo " Setup concluido!"
+echo " Aplicacao: http://<IP-do-servidor>:${NGINX_PORT}  (via container nginx)"
+echo " Usuarios padrao (alterar no primeiro login):"
+echo "   admin      / Admin@2026Temp!      (nivel admin)"
+if [ "$APP_ENV" != "production" ]; then
+    echo "   supervisor / Supervisor@2026Temp! (nivel supervisor)"
+fi
+echo "======================================================"

@@ -1,0 +1,22 @@
+ErrorDocument 403 public/403.html
+ErrorDocument 404 public/404.html
+AddDefaultCharset UTF-8
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Bloqueia acesso direto a pastas sensiveis na raiz do projeto
+    RewriteRule ^(?:db|config|inc|scripts|fotos_visitantes)(?:/|$) - [F,L,NC]
+
+    # Bloqueia acesso direto a arquivos sensiveis por extensao
+    RewriteRule \.(?:sql|env|ini|log|bak)$ - [F,L,NC]
+
+    # Se a requisicao e para arquivo/diretorio existente, serve direto
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Redireciona tudo para public/index.php com a URL original em "page"
+    RewriteRule ^(.*)$ public/index.php?page=$1 [QSA,L]
+</IfModule>
+
+Options -Indexes

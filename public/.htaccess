@@ -1,0 +1,15 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Bloqueia tentativas de acesso a caminhos sensiveis via /public/...
+    RewriteRule ^(?:db|config|inc|scripts|fotos_visitantes)(?:/|$) - [F,L,NC]
+    RewriteRule \.(?:sql|env|ini|log|bak)$ - [F,L,NC]
+
+    # Se o arquivo/diretorio nao existe, redireciona para index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+Options -Indexes

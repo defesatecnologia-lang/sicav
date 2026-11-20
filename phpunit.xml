@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         colors="true"
+         recordTestRunHistory="false"
+         bootstrap="tests/bootstrap.php">
+  <source>
+    <include>
+      <directory suffix=".php">src</directory>
+      <directory suffix=".php">config</directory>
+      <directory suffix=".php">inc</directory>
+    </include>
+  </source>
+  <testsuites>
+    <testsuite name="Validators">
+      <file>tests/ValidatorsTest.php</file>
+    </testsuite>
+    <testsuite name="LoginSecurity">
+      <file>tests/LoginSecurityTest.php</file>
+    </testsuite>
+    <testsuite name="Session">
+      <file>tests/SessionTest.php</file>
+    </testsuite>
+    <testsuite name="ApiPermissions">
+      <file>tests/ApiPermissionsTest.php</file>
+    </testsuite>
+    <testsuite name="FotoUpload">
+      <file>tests/FotoUploadTest.php</file>
+    </testsuite>
+    <testsuite name="Helpers">
+      <file>tests/HelpersTest.php</file>
+    </testsuite>
+    <testsuite name="ProxyIP">
+      <file>tests/ProxyIpTest.php</file>
+    </testsuite>
+    <testsuite name="Router">
+      <file>tests/RouterTest.php</file>
+    </testsuite>
+    <testsuite name="Middleware">
+      <file>tests/AuthMiddlewareTest.php</file>
+      <file>tests/CsrfMiddlewareTest.php</file>
+    </testsuite>
+  </testsuites>
+</phpunit>

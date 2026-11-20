@@ -1,0 +1,98 @@
+# Imagens fixadas por digest (sha256) para build reproduzivel.
+# Para atualizar: ./scripts/pin-images.sh
+FROM composer:2@sha256:ca11f643d7791ebdd90a34fc20caf11380d434007ae539a9ea75cd9212e13dca AS composer
+
+FROM php:8.5-apache@sha256:0110f2cd5f4d58417afc7340b22c4ddcce54e970b87c03a6c77259b07b47c325
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+LABEL maintainer="Sistema de Visitantes <dev@example.com>"
+LABEL description="Sistema de Gerenciamento de Visitantes"
+
+ARG ENVIRONMENT=production
+
+# Aplica as atualizacoes de seguranca publicadas depois da imagem base
+# (ex.: apache2 2.4.69 -> 2.4.71 e linux-libc-dev). O digest da imagem base
+# continua fixado; o apt busca apenas correcoes da distro no momento do build.
+RUN set -eux; \
+    export DEBIAN_FRONTEND=noninteractive; \
+    apt-get update; \
+    apt-get upgrade -y; \
+    apt-get install -y --no-install-recommends \
+        libpng-dev \
+        libjpeg-dev \
+        libfreetype6-dev \
+        libzip-dev \
+        unzip \
+        git \
+        curl; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg; \
+    docker-php-ext-install -j"$(nproc)" \
+        pdo \
+        pdo_mysql \
+        gd \
+        zip \
+    && docker-php-ext-enable pdo_mysql gd zip
+
+RUN set -eux; \
+    a2enmod rewrite headers expires remoteip; \
+    echo "ServerName localhost" >> /etc/apache2/apache2.conf
+
+COPY docker/apache.conf /etc/apache2/sites-available/000-default.conf
+
+COPY docker/php.ini /usr/local/etc/php/conf.d/custom.ini
+
+COPY . /var/www/html/
+
+COPY --from=composer /usr/bin/composer /usr/local/bin/composer
+
+RUN set -eux; \
+    if [ "$ENVIRONMENT" = "production" ]; then \
+        composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader; \
+    else \
+        composer install --no-interaction --prefer-dist; \
+    fi; \
+    rm -f /usr/local/bin/composer
+
+# Node.js e testes (PHP + sintaxe JS) apenas no build de desenvolvimento.
+# A imagem de producao nao leva Node/npm: isso elimina os achados de
+# vulnerabilidade das dependencias npm empacotadas na imagem oficial do Node.
+# O check de sintaxe JS tambem roda no workflow Tests (job Frontend).
+RUN set -eux; \
+    if [ "$ENVIRONMENT" != "production" ]; then \
+        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
+        apt-get install -y --no-install-recommends nodejs; \
+        rm -rf /var/lib/apt/lists/*; \
+        vendor/bin/phpunit; \
+        find public/assets/js -name '*.js' -print0 | xargs -0 -n1 node --check; \
+    fi
+
+RUN set -eux; \
+    if [ "$ENVIRONMENT" = "production" ]; then \
+        rm -f /var/www/html/.env; \
+        rm -rf /var/www/html/node_modules; \
+        find /var/www/html -name "*.md" -delete; \
+    fi
+
+RUN set -eux; \
+    groupadd --gid 1000 app && \
+    useradd --uid 1000 --gid app --no-create-home --home-dir /var/www/html --shell /usr/sbin/nologin app && \
+    sed -ri 's/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=app/; s/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=app/' /etc/apache2/envvars && \
+    mkdir -p /var/www/html/fotos_visitantes && \
+    chown -R app:app /var/www/html && \
+    chmod 755 /var/www/html/fotos_visitantes
+
+COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+WORKDIR /var/www/html
+
+USER app
+
+EXPOSE 80
+
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["apache2-foreground"]

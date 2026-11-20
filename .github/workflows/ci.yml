@@ -1,0 +1,270 @@
+name: Infra
+
+on:
+  push:
+    branches: [main, fix/dev-development]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    name: Docker Compose config
+    runs-on: ubuntu-latest
+    env:
+      # O compose nao tem mais fallback de credenciais: sem estas variaveis
+      # ele falha de proposito. Na CI usamos placeholders.
+      VISITORPASS_DB_PASS: ci-placeholder
+      MYSQL_ROOT_PASSWORD: ci-placeholder
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validate production compose
+        run: docker compose config --quiet
+
+      - name: Validate dev override
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+
+      - name: No development credential fallbacks
+        run: |
+          if grep -nE ':-visitorpassword|:-rootpassword' docker-compose.yml; then
+            echo "credencial padrao de desenvolvimento reintroduzida no compose"
+            exit 1
+          fi
+
+  lint:
+    name: Lint (Docker/Shell)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: ShellCheck
+        # -x segue o source= apontando para scripts/lib/env-loader.sh
+        run: shellcheck -x scripts/*.sh scripts/lib/*.sh docker/*.sh
+
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.5.0
+        with:
+          dockerfile: Dockerfile
+          config: .hadolint.yaml
+
+  coverage:
+    name: Code coverage (PHP 8.4)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, dom, gd, pdo, sodium
+          coverage: pcov
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run PHPUnit with coverage
+        run: |
+          mkdir -p coverage
+          vendor/bin/phpunit --coverage-text --coverage-clover coverage/clover.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-clover
+          path: coverage/clover.xml
+          retention-days: 14
+
+  smoke:
+    name: Stack smoke test (compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Senhas obrigatorias do compose (sem fallback no arquivo).
+      VISITORPASS_DB_PASS: smoke-placeholder
+      MYSQL_ROOT_PASSWORD: smoke-placeholder
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare data directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/mysql" "$RUNNER_TEMP/fotos"
+          sudo chown -R 999:999 "$RUNNER_TEMP/mysql"
+          sudo chown -R 1000:1000 "$RUNNER_TEMP/fotos"
+
+      - name: Build and start stack
+        env:
+          DB_DATA_DIR: ${{ runner.temp }}/mysql
+          FOTOS_DIR: ${{ runner.temp }}/fotos
+        run: docker compose up -d --build
+
+      - name: Wait for database
+        run: |
+          for i in $(seq 1 60); do
+            cid=$(docker compose ps -q db)
+            health=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || echo starting)
+            echo "db health: $health"
+            if [ "$health" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$i" -eq 60 ]; then
+              echo "ERRO: banco nao ficou saudavel"
+              docker compose logs db
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Wait for app through nginx
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/ || true)
+            echo "HTTP $code"
+            case "$code" in
+              200|302|303) exit 0 ;;
+            esac
+            if [ "$i" -eq 60 ]; then
+              echo "ERRO: aplicacao nao respondeu pela porta 8000"
+              docker compose logs
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
+
+      - name: Validate request ID and real client IP through nginx
+        run: |
+          set -eu
+          # Uma tentativa de login invalida gera LOGIN_FAILURE na auditoria do
+          # app (AUDIT JSON no log), o que nos da o request_id e o IP vistos
+          # pelo PHP. Usa-se o IP do runner: com 127.0.0.1 o docker-proxy
+          # reescreve a origem para o gateway da bridge e a comparacao
+          # nginx x PHP ficaria sem sentido.
+          host_ip=$(hostname -I | awk '{print $1}')
+          base="http://$host_ip:8000"
+
+          rm -f cookies.txt
+          login_page=$(curl -s -c cookies.txt "$base/index.php?page=login")
+          csrf=$(printf '%s' "$login_page" | grep -oE 'name="csrf_token" value="[^"]+"' \
+                 | head -1 | sed -E 's/.*value="([^"]+)".*/\1/')
+          if [ -z "$csrf" ]; then
+            echo "ERRO: nao foi possivel obter o csrf_token da pagina de login"
+            curl -s "$base/index.php?page=login" | head -5
+            exit 1
+          fi
+          curl -s -o /dev/null -b cookies.txt \
+            -d "csrf_token=$csrf" \
+            -d "text_usuario=usuario-inexistente-$RANDOM" \
+            -d "text_senha=senha-errada" \
+            "$base/index.php?page=login_submit"
+
+          # request_id: igual na linha de acesso do nginx e no evento do PHP.
+          # IP: o valor que o nginx viu em $remote_addr e o que o PHP registrou
+          # precisam ser o mesmo (mod_remoteip).
+          nginx_line=$(docker compose logs --no-log-prefix nginx --tail 3 | tail -1)
+          nginx_rid=$(printf '%s' "$nginx_line" | grep -oE '^[0-9a-f]{32}' | tail -1)
+          nginx_ip=$(printf '%s' "$nginx_line" | awk '{print $2}')
+          if [ -z "$nginx_rid" ] || [ -z "$nginx_ip" ]; then
+            echo "ERRO: access log do nginx sem request_id/IP"
+            docker compose logs --tail 20
+            exit 1
+          fi
+          app_rid=$(docker compose logs --no-log-prefix app --tail 50 \
+                    | grep -aoE '"request_id":"[0-9a-f]{32}"' | tail -1 | cut -d'"' -f4)
+          app_ip=$(docker compose logs --no-log-prefix app --tail 50 \
+                   | grep -aoE '"ip":"[^"]+"' | tail -1 | cut -d'"' -f4)
+          if [ -z "$app_rid" ] || [ "$nginx_rid" != "$app_rid" ]; then
+            echo "ERRO: request_id divergente (nginx=$nginx_rid app=$app_rid)"
+            exit 1
+          fi
+          if [ "$nginx_ip" != "$app_ip" ]; then
+            echo "ERRO: IP divergente (nginx=$nginx_ip app=$app_ip)"
+            docker compose logs --no-log-prefix app --tail 20
+            exit 1
+          fi
+
+          echo "OK: request_id=$nginx_rid ip=$app_ip"
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  scan-app:
+    name: Image scan - app (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build application image
+        run: docker build -t sicav-app:scan .
+
+      - name: Scan image for HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sicav-app:scan
+          scan-type: image
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+  scan-nginx:
+    name: Image scan - nginx (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      # A imagem do nginx e construida localmente (docker/nginx.Dockerfile)
+      # sobre o digest fixado, com "apk upgrade" para aplicar correcoes que
+      # ainda nao estao no build oficial do Alpine.
+      - name: Build nginx image
+        run: docker build -f docker/nginx.Dockerfile -t sicav-nginx:scan .
+
+      - name: Scan image for HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sicav-nginx:scan
+          scan-type: image
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+
+  scan-base:
+    name: Image scan - mysql (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build MySQL image with Oracle Linux updates
+        run: docker build -f docker/mysql.Dockerfile -t sicav-mysql:scan .
+
+      - name: Scan MySQL for HIGH/CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: sicav-mysql:scan
+          scan-type: image
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          # Excecoes limitadas a componentes auxiliares nao usados pelo app.
+          trivyignores: .trivyignore.yaml
+          exit-code: "1"
+          format: table
+
+  # O phpMyAdmin nao entra no gate de producao: ele existe apenas no
+  # docker-compose.dev.yml e nao e publicado no deploy. A validacao do override
+  # de desenvolvimento continua no job "Docker Compose config".
