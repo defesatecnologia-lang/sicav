@@ -35,8 +35,8 @@ until VISITORPASS_DB_PASS="$VISITORPASS_DB_PASS" php -r '
             [PDO::ATTR_TIMEOUT => 3]
         );
         echo "ok";
-    } catch (PDOException $e) {
-        echo $e->getMessage();
+    } catch (PDOException) {
+        echo "Falha ao conectar no MySQL";
         exit(1);
     }
 ' 2>/dev/null | grep -q 'ok'; do
