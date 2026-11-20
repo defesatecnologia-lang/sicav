@@ -19,16 +19,23 @@ echo "--> Preflight..."
 echo "--> Build e subida da stack..."
 docker compose -f "$ROOT/docker-compose.yml" up -d --build --remove-orphans
 
-echo "--> Aguardando app e nginx ficarem healthy..."
+# O entrypoint grava /tmp/migration-ok somente se migrate.php terminou sem erro.
+migration_ok() {
+    docker compose -f "$ROOT/docker-compose.yml" exec -T app \
+        test -f /tmp/migration-ok >/dev/null 2>&1
+}
+
+echo "--> Aguardando migracao e app/nginx healthy..."
 for i in $(seq 1 90); do
     statuses="$(docker compose -f "$ROOT/docker-compose.yml" ps app nginx --format '{{.Service}} {{.Status}}' 2>/dev/null || true)"
-    if [[ "$(grep -c 'healthy' <<< "$statuses")" -ge 2 ]]; then
+    if migration_ok && [[ "$(grep -c 'healthy' <<< "$statuses")" -ge 2 ]]; then
         echo "$statuses"
-        echo "OK: deploy concluido."
+        echo "OK: deploy concluido (migracao OK)."
         exit 0
     fi
     if [[ "$i" -eq 90 ]]; then
-        echo "ERRO: app/nginx nao ficaram healthy em 180s." >&2
+        migration_state="$(migration_ok && echo OK || echo PENDENTE_OU_FALHA)"
+        echo "ERRO: app/nginx nao ficaram healthy em 180s (migracao: $migration_state)." >&2
         echo "$statuses" >&2
         docker compose -f "$ROOT/docker-compose.yml" logs app nginx --tail 50 >&2
         exit 1

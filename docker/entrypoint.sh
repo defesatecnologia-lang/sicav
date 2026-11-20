@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Sem fallback de senha fraca: o compose/preflight exigem esta variavel.
+: "${VISITORPASS_DB_PASS:?defina VISITORPASS_DB_PASS no ambiente}"
+
 # .env é opcional em produção: o Docker Compose injeta as variáveis
 # diretamente via environment. Em filesystems read_only (hardening),
 # apenas usa o .env se ele já existir e for legível.
@@ -23,22 +26,32 @@ if [ "$(id -u)" = "0" ]; then
 fi
 
 echo "--> Waiting for MySQL..."
-until php -r "
+until VISITORPASS_DB_PASS="$VISITORPASS_DB_PASS" php -r '
     try {
-        new PDO('mysql:host=${VISITORPASS_DB_HOST:-db};port=${VISITORPASS_DB_PORT:-3306}', '${VISITORPASS_DB_USER:-vpuser}', '${VISITORPASS_DB_PASS:-visitorpassword}', [PDO::ATTR_TIMEOUT => 3]);
-        echo 'ok';
-    } catch (PDOException \$e) {
-        echo \$e->getMessage();
+        new PDO(
+            sprintf("mysql:host=%s;port=%s", getenv("VISITORPASS_DB_HOST") ?: "db", getenv("VISITORPASS_DB_PORT") ?: "3306"),
+            getenv("VISITORPASS_DB_USER") ?: "vpuser",
+            getenv("VISITORPASS_DB_PASS"),
+            [PDO::ATTR_TIMEOUT => 3]
+        );
+        echo "ok";
+    } catch (PDOException $e) {
+        echo $e->getMessage();
         exit(1);
     }
-" 2>/dev/null | grep -q 'ok'; do
+' 2>/dev/null | grep -q 'ok'; do
     sleep 2
 done
 
 echo "--> MySQL is ready!"
 
 echo "--> Running database migration..."
-php /var/www/html/docker/migrate.php || echo "WARNING: Migration may have failed, check database."
+if ! php /var/www/html/docker/migrate.php; then
+    echo "ERRO: migracao falhou; abortando inicializacao do app." >&2
+    exit 1
+fi
+# Sinal consumido por scripts/deploy.sh: so existe se a migracao terminou bem.
+touch /tmp/migration-ok
 
 # ---------------------------------------------------------------------------
 # Proxy confiavel do Apache (mod_remoteip)
