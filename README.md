@@ -191,9 +191,15 @@ sudo chown 999:999 /mnt/visitantes/mysql
 sudo chown 1000:1000 /mnt/visitantes/fotos
 # Ubuntu usa AppArmor (não SELinux): os bind mounts funcionam sem os sufixos :z/:Z.
 
-# Configure variáveis seguras
+# Crie o .env a partir do exemplo e proteja o arquivo (se ainda nao existir)
+cp .env.example.docker .env
+chmod 600 .env
 vim .env
-# Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD
+# Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD,
+# VISITORPASS_ADMIN_INITIAL_PASSWORD (senha inicial do admin, so no 1o boot),
+# BACKUP_GPG_RECIPIENT e BACKUP_REMOTE (obrigatorios no preflight de producao).
+# A senha inicial do admin tambem pode ser gerada com:
+#   printf 'VISITORPASS_ADMIN_INITIAL_PASSWORD=Vp1!%s\n' "$(openssl rand -hex 12)" >> .env
 # Porta externa do sistema (troque se houver mais de um sistema no servidor):
 #   NGINX_PORT=8000
 # Prefixo de containers/redes (troque para cada sistema/instância):
