@@ -1,19 +1,13 @@
 <div align="center">
-  <img src="/public/imagens/corporativo.png" alt="Logo" width="400">
+  <img src="/public/imagens/Logo_sicav.png" alt="Logo" width="300">
 
   <h1>Sistema de Gerenciamento e Controle de Visitantes</h1>
 
   <p align="center">
 
- 
-
-  </p>
+   </p>
 </div>
 
-# Sistema de Visitantes (SICAV)
-
-# SICAV
-**Sistema de Gerenciamento e Controle de Visitantes**
 
 O SICAV é um sistema desenvolvido para modernizar, organizar e aumentar a segurança no processo de gerenciamento e controle de visitantes em instituições, empresas e órgãos públicos.
 
