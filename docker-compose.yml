@@ -34,6 +34,8 @@ services:
       VISITORPASS_DB_NAME: ${VISITORPASS_DB_NAME:-visitorpass}
       VISITORPASS_DB_USER: ${VISITORPASS_DB_USER:-vpuser}
       VISITORPASS_DB_PASS: ${VISITORPASS_DB_PASS:?defina VISITORPASS_DB_PASS no .env}
+      # Senha inicial do admin apenas no primeiro boot; depois trocada no primeiro login.
+      VISITORPASS_ADMIN_INITIAL_PASSWORD: ${VISITORPASS_ADMIN_INITIAL_PASSWORD:-}
       VISITORPASS_SESSION_TIMEOUT: ${VISITORPASS_SESSION_TIMEOUT:-3600}
       VISITORPASS_SESSION_ABSOLUTE_LIFETIME: ${VISITORPASS_SESSION_ABSOLUTE_LIFETIME:-43200}
       VISITORPASS_APP_NAME: "Sistema de Visitantes"
@@ -142,7 +144,7 @@ services:
       # No host: chown 999:999 ${DB_DATA_DIR:-/mnt/visitantes/mysql}
       - ${DB_DATA_DIR:-/mnt/visitantes/mysql}:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost -u root"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -36,6 +36,11 @@ if [ ! -f .env ]; then
     # O exemplo e seguro por padrao (APP_ENV=production). Este script e
     # exclusivamente de desenvolvimento, entao forca o modo dev no .env gerado.
     sed -i 's/^APP_ENV=.*/APP_ENV=development/' .env
+    # Nunca versionar/imprimir senha inicial: gere uma unica no .env local.
+    command -v openssl >/dev/null || { echo "ERRO: openssl e necessario para gerar a senha inicial." >&2; exit 1; }
+    admin_initial="Vp1!$(openssl rand -hex 12)"
+    printf 'VISITORPASS_ADMIN_INITIAL_PASSWORD=%s\n' "$admin_initial" >> .env
+    chmod 600 .env
 else
     echo "--> .env ja existe, mantendo."
 fi
@@ -117,9 +122,9 @@ echo
 echo "======================================================"
 echo " Setup concluido!"
 echo " Aplicacao: http://<IP-do-servidor>:${NGINX_PORT}  (via container nginx)"
-echo " Usuarios padrao (alterar no primeiro login):"
-echo "   admin      / Admin@2026Temp!      (nivel admin)"
+echo " Senha inicial do admin: definida no .env local (nao exibida no log)."
 if [ "$APP_ENV" != "production" ]; then
-    echo "   supervisor / Supervisor@2026Temp! (nivel supervisor)"
+    echo " Senha do supervisor (dev): docker compose exec app cat /tmp/visitantes-senhas-iniciais"
 fi
+echo " O sistema exige a troca de senha no primeiro login de cada usuario."
 echo "======================================================"

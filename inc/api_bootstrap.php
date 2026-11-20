@@ -82,8 +82,15 @@ function apiRequireEndpointAccess(): void
     // index.php; o endpoint vem do parametro 'page'.
     $endpoint = resolveApiEndpoint($_GET['page'] ?? '', $_SERVER['SCRIPT_NAME'] ?? '');
 
-    $requiredAccess = $map[$endpoint] ?? 'user';
-    apiRequireAuth($requiredAccess);
+    if (!array_key_exists($endpoint, $map)) {
+        logEvent('AUTHORIZATION_DENIED', [
+            'endpoint' => $endpoint,
+            'reason' => 'unmapped_endpoint',
+        ]);
+        apiError('Endpoint nao autorizado', 403);
+    }
+
+    apiRequireAuth($map[$endpoint]);
 }
 
 function apiRequireAuth(string $requiredAccess = 'user'): void
@@ -124,6 +131,15 @@ function apiRequireAuth(string $requiredAccess = 'user'): void
             'reason' => 'concurrent_login',
             'error' => 'Sua conta foi acessada em outro dispositivo.',
         ], 401);
+    }
+
+    if ((int) ($_SESSION['usuario']->senha_temporaria ?? 0) === 1) {
+        apiJsonResponse([
+            'success' => false,
+            'status' => 'password_change_required',
+            'error' => 'Senha temporaria: troque a senha antes de usar a API.',
+            'redirect' => 'index.php?page=trocar_senha',
+        ], 403);
     }
 
     if (!userHasAccess($requiredAccess)) {

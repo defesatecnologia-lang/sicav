@@ -71,8 +71,15 @@ class ApiPermissionsTest extends TestCase
         }
     }
 
-    public function testUnknownEndpointFallsBackToUser(): void
+    public function testUnknownEndpointIsNotInPermissionMap(): void
     {
-        $this->assertSame('user', (require __DIR__ . '/../config/permissions.php')['nao_existe'] ?? 'user');
+        $map = require __DIR__ . '/../config/permissions.php';
+
+        // apiRequireEndpointAccess() now denies endpoints absent from the map
+        // instead of falling back to 'user' (fail-open).
+        $this->assertArrayNotHasKey('nao_existe', $map);
+        foreach ($map as $requiredAccess) {
+            $this->assertContains($requiredAccess, ['user', 'supervisor', 'admin']);
+        }
     }
 }

@@ -81,6 +81,27 @@ else
         fail "VISITORPASS_DB_PASS e MYSQL_ROOT_PASSWORD nao podem ser iguais."
     fi
 
+    # Senha inicial do admin: obrigatoria apenas para o primeiro boot do banco.
+    ADMIN_INITIAL="${VISITORPASS_ADMIN_INITIAL_PASSWORD:-}"
+    [[ -n "$ADMIN_INITIAL" ]] || \
+        fail "VISITORPASS_ADMIN_INITIAL_PASSWORD nao definida no .env (usada apenas no primeiro boot)."
+    if printf '%s' "$ADMIN_INITIAL" | grep -Eqi "^(${PLACEHOLDERS}|admin@2026temp!|supervisor@2026temp!)$"; then
+        fail "VISITORPASS_ADMIN_INITIAL_PASSWORD ainda esta com valor placeholder/fraco."
+    fi
+    if [[ "${#ADMIN_INITIAL}" -lt 12 ]]; then
+        fail "VISITORPASS_ADMIN_INITIAL_PASSWORD tem ${#ADMIN_INITIAL} caracteres; o minimo e 12."
+    fi
+
+    # Backup: destino remoto e GPG obrigatorios em producao.
+    for var in BACKUP_GPG_RECIPIENT BACKUP_REMOTE; do
+        value="${!var:-}"
+        [[ -n "$value" ]] || fail "$var nao definida no .env — backup local no mesmo drive nao e aceito em producao."
+        if printf '%s' "$value" | grep -Eqi "^(${PLACEHOLDERS}|troque-esta-senha-.*|.*@outro-host:.*)$"; then
+            fail "$var ainda esta com valor placeholder."
+        fi
+    done
+    echo "    Backup remoto: ${BACKUP_REMOTE} (restore de teste obrigatorio antes do go-live)"
+
     NGINX_PORT="${NGINX_PORT:-8000}"
     if [[ ! "$NGINX_PORT" =~ ^[0-9]+$ ]] || (( NGINX_PORT < 1 || NGINX_PORT > 65535 )); then
         fail "NGINX_PORT invalida: '$NGINX_PORT'."

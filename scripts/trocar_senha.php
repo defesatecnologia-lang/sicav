@@ -3,7 +3,7 @@ ob_start();
 
 require_once __DIR__ . '/../config/database.php';
 
-if ($_SESSION['usuario']->senha_temporaria === 0) {
+if ((int) ($_SESSION['usuario']->senha_temporaria ?? 0) !== 1) {
     header('Location: index.php?page=home');
     exit;
 }

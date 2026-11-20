@@ -91,6 +91,8 @@ jobs:
       # Senhas obrigatorias do compose (sem fallback no arquivo).
       VISITORPASS_DB_PASS: smoke-placeholder
       MYSQL_ROOT_PASSWORD: smoke-placeholder
+      # migrate.php exige senha inicial do admin mesmo no smoke (fail-closed).
+      VISITORPASS_ADMIN_INITIAL_PASSWORD: SmokeAdmin@2026!
     steps:
       - uses: actions/checkout@v7
 

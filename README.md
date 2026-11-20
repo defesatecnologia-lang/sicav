@@ -191,9 +191,15 @@ sudo chown 999:999 /mnt/visitantes/mysql
 sudo chown 1000:1000 /mnt/visitantes/fotos
 # Ubuntu usa AppArmor (não SELinux): os bind mounts funcionam sem os sufixos :z/:Z.
 
-# Configure variáveis seguras
+# Crie o .env a partir do exemplo e proteja o arquivo (se ainda nao existir)
+cp .env.example.docker .env
+chmod 600 .env
 vim .env
-# Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD
+# Use senhas fortes para: VISITORPASS_DB_PASS, MYSQL_ROOT_PASSWORD,
+# VISITORPASS_ADMIN_INITIAL_PASSWORD (senha inicial do admin, so no 1o boot),
+# BACKUP_GPG_RECIPIENT e BACKUP_REMOTE (obrigatorios no preflight de producao).
+# A senha inicial do admin tambem pode ser gerada com:
+#   printf 'VISITORPASS_ADMIN_INITIAL_PASSWORD=Vp1!%s\n' "$(openssl rand -hex 12)" >> .env
 # Porta externa do sistema (troque se houver mais de um sistema no servidor):
 #   NGINX_PORT=8000
 # Prefixo de containers/redes (troque para cada sistema/instância):
@@ -277,28 +283,38 @@ Em caso de problema, veja [Solução de problemas](#solução-de-problemas).
 
 ### Primeiro acesso
 
-Na primeira execução, `docker/migrate.php` (rodado automaticamente no boot do
-app) cria o schema e o usuário padrão com **senha temporária** — o login força
-a troca de senha no primeiro acesso:
+**Não existe mais senha administrativa fixa versionada.** Na primeira execução,
+`docker/migrate.php` (rodado automaticamente no boot do app) cria o schema e o
+usuário `admin` usando `VISITORPASS_ADMIN_INITIAL_PASSWORD` do `.env`. Se essa
+variável estiver vazia, fraca ou com placeholder em produção, a migração falha
+e o deploy aborta — não há fallback de senha conhecida.
+
+Gere a senha inicial antes do deploy (uma vez, no `.env` do servidor):
+
+```bash
+printf 'VISITORPASS_ADMIN_INITIAL_PASSWORD=Vp1!%s\n' "$(openssl rand -hex 12)" >> .env
+chmod 600 .env
+```
 
 | Ambiente | Usuário | Senha inicial | Nível |
 |----------|---------|---------------|-------|
-| Produção (`APP_ENV=production`) | `admin` | `Admin@2026Temp!` | admin |
-| Desenvolvimento (`APP_ENV=development`) | `admin` | `Admin@2026Temp!` | admin |
-| Desenvolvimento (`APP_ENV=development`) | `supervisor` | `Supervisor@2026Temp!` | supervisor |
+| Produção (`APP_ENV=production`) | `admin` | valor de `VISITORPASS_ADMIN_INITIAL_PASSWORD` | admin |
+| Desenvolvimento | `admin` | gerada e gravada em `/tmp/visitantes-senhas-iniciais` (0600) no container | admin |
+| Desenvolvimento | `supervisor` | gerada e gravada no mesmo arquivo | supervisor |
 
 Em **produção apenas o `admin` é criado**. O supervisor (e os demais usuários)
 deve ser criado depois pelo próprio admin em **Administração → Listar Usuários**.
 O `supervisor` padrão só existe em desenvolvimento, para facilitar os testes
 de níveis de acesso.
 
-**Altere a senha imediatamente no primeiro login** — o sistema redireciona
-para a tela de troca de senha até que a troca seja feita.
+O flag `senha_temporaria` agora bloqueia **todas** as páginas e APIs enquanto
+estiver ativo: apenas `trocar_senha` (e `logout`) ficam acessíveis. A senha
+inicial deve ser trocada no primeiro login de cada usuário criado.
 
-#### Alternativa: criar seu usuário e desativar o padrão
+#### Alternativa: criar seu usuário e desativar o bootstrap
 
-Se preferir não usar credenciais padrão versionadas, crie seu usuário direto
-no banco e desative o padrão:
+Se preferir criar seu próprio administrador direto no banco, faça isso e
+desative o usuário do bootstrap:
 
 ```bash
 # Gere o hash Argon2id da sua senha
@@ -386,6 +402,16 @@ sudo chown -R 1000:1000 /mnt/visitantes/fotos
 
 > Antes do go-live, **execute esse restore em um host de teste** e registre o
 > RTO/RPO obtidos. Um backup sem restore validado não é backup.
+
+#### Checklist de go-live (todos os itens obrigatórios)
+
+- [ ] `VISITORPASS_ADMIN_INITIAL_PASSWORD` definida no `.env` (≥12 caracteres, não versionada) e senha do `admin` trocada no primeiro login.
+- [ ] `scripts/deploy.sh` conclui com "migracao OK"; uma falha de `migrate.php` aborta o deploy.
+- [ ] `BACKUP_REMOTE` e `BACKUP_GPG_RECIPIENT` configurados; `scripts/preflight.sh` aprovado.
+- [ ] Restore completo executado em host de teste, com RTO/RPO medidos e registrados.
+- [ ] Porta `8000` liberada no firewall **apenas para a subnet interna** (ex.: `ufw allow from 10.10.10.0/24 to any port 8000 proto tcp`).
+- [ ] Aceite formal do risco TLS (rede interna isolada) registrado; se a rede for compartilhada, terminar TLS antes do go-live.
+- [ ] Branch `main` protegida no GitHub (PR obrigatória, ≥1 aprovação e status checks).
 
 ### Atualização da stack
 
@@ -494,13 +520,21 @@ Variáveis lidas pelo `docker-compose.yml` a partir do `.env` (não commitado):
 | `COMPOSE_PROJECT_NAME` | nome da pasta | Prefixo de containers/redes — use valores distintos para cada sistema no mesmo servidor |
 | `VISITORPASS_DB_NAME` | `visitorpass` | Nome do banco |
 | `VISITORPASS_DB_USER` | `vpuser` | Usuário da aplicação |
-| `VISITORPASS_DB_PASS` | — | **Obrigatória em produção**: senha da aplicação |
+| `VISITORPASS_DB_PASS` | — | **Obrigatória em produção**: senha da aplicação (sem fallback) |
 | `MYSQL_ROOT_PASSWORD` | — | **Obrigatória em produção**: senha root do MySQL |
+| `VISITORPASS_ADMIN_INITIAL_PASSWORD` | — | **Obrigatória no primeiro boot**: senha inicial do `admin`; nunca versionar |
 | `DB_DATA_DIR` | `/mnt/visitantes/mysql` | Pasta dos dados do MySQL (drive dedicado) |
 | `FOTOS_DIR` | `/mnt/visitantes/fotos` | Pasta das fotos dos visitantes (drive dedicado) |
 | `VISITORPASS_SESSION_TIMEOUT` | `3600` | Timeout de inatividade da sessão (segundos) |
 | `VISITORPASS_SESSION_ABSOLUTE_LIFETIME` | `43200` | Vida máxima absoluta da sessão (segundos) |
 | `PMA_PORT` | `8081` | Porta do phpMyAdmin — **apenas no override de desenvolvimento** |
+| `BACKUP_GPG_RECIPIENT` | — | **Obrigatório em produção**: destinatário da chave pública GPG |
+| `BACKUP_REMOTE` | — | **Obrigatório em produção**: destino rsync em outro host/disco |
+| `BACKUP_DIR` | `/mnt/visitantes/backups` | Diretório local de staging dos backups |
+
+`VISITORPASS_ADMIN_INITIAL_PASSWORD` precisa permanecer no `.env` mesmo após o
+primeiro boot (o preflight a valida em todo deploy), mas **não é reutilizada**
+se o usuário `admin` já existir no banco.
 
 Sem `VISITORPASS_DB_PASS` e `MYSQL_ROOT_PASSWORD` o `docker compose` **falha
 de propósito** (`${VAR:?...}`): não existe mais fallback de credencial de

@@ -8,7 +8,19 @@ $host = getenv('VISITORPASS_DB_HOST') ?: 'db';
 $port = getenv('VISITORPASS_DB_PORT') ?: '3306';
 $dbname = getenv('VISITORPASS_DB_NAME') ?: 'visitorpass';
 $user = getenv('VISITORPASS_DB_USER') ?: 'vpuser';
-$pass = getenv('VISITORPASS_DB_PASS') ?: 'visitorpassword';
+$pass = getenv('VISITORPASS_DB_PASS');
+$adminInitialPassword = getenv('VISITORPASS_ADMIN_INITIAL_PASSWORD') ?: '';
+
+if ($pass === false || $pass === '') {
+    fwrite(STDERR, "ERRO: VISITORPASS_DB_PASS nao definida. Sem fallback de senha fraca.\n");
+    exit(1);
+}
+
+/** Senha aleatoria com maiuscula, minuscula, digito e especial. */
+function generateInitialPassword(): string
+{
+    return 'Vp1!' . bin2hex(random_bytes(12));
+}
 
 try {
     $pdo = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $user, $pass, [
@@ -214,25 +226,55 @@ try {
             END IF;
         END");
 
-    // Criar usuario admin padrao se nao existir.
-    // Em producao cria somente o admin; o supervisor (e demais usuarios)
-    // deve ser criado depois pelo admin na interface administrativa.
+    // Criar usuario admin se nao existir. Nunca existe senha fixa versionada:
+    // em producao a senha inicial vem de VISITORPASS_ADMIN_INITIAL_PASSWORD;
+    // em dev, e gerada e gravada em arquivo 0600 (nunca impressa no log).
     $isProduction = (getenv('VISITORPASS_ENV') ?: 'production') === 'production';
+    $weakPasswords = [
+        'admin@2026temp!', 'supervisor@2026temp!', 'troque-esta-senha',
+        'troque-esta-senha-root', 'visitorpassword', 'changeme',
+        'password', 'secret', 'admin', '123456',
+    ];
+    if ($adminInitialPassword !== ''
+        && in_array(strtolower($adminInitialPassword), $weakPasswords, true)) {
+        fwrite(STDERR, "ERRO: VISITORPASS_ADMIN_INITIAL_PASSWORD esta com valor fraco/placeholder.\n");
+        exit(1);
+    }
+
+    $devSecrets = [];
     $check = $pdo->query("SELECT COUNT(*) FROM usuarios WHERE usuario = 'admin'")->fetchColumn();
     if ($check == 0) {
-        $hash = password_hash('Admin@2026Temp!', PASSWORD_ARGON2ID);
+        if ($adminInitialPassword === '') {
+            if ($isProduction) {
+                fwrite(STDERR, "ERRO: defina VISITORPASS_ADMIN_INITIAL_PASSWORD no .env antes do primeiro boot em producao.\n");
+                exit(1);
+            }
+            $adminInitialPassword = generateInitialPassword();
+            $devSecrets[] = "admin: {$adminInitialPassword}";
+        }
+
+        $hash = password_hash($adminInitialPassword, PASSWORD_ARGON2ID);
         $pdo->prepare("INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, senha_temporaria)
             VALUES ('Administrador Sistema', 'admin', ?, 'admin', 1)")->execute([$hash]);
 
         if (!$isProduction) {
-            $hash = password_hash('Supervisor@2026Temp!', PASSWORD_ARGON2ID);
+            $supervisorPassword = generateInitialPassword();
+            $devSecrets[] = "supervisor: {$supervisorPassword}";
+            $hash = password_hash($supervisorPassword, PASSWORD_ARGON2ID);
             $pdo->prepare("INSERT INTO usuarios (nome, usuario, senha, nivel_acesso, senha_temporaria)
                 VALUES ('Supervisor Sistema', 'supervisor', ?, 'supervisor', 1)")->execute([$hash]);
         }
 
         echo $isProduction
-            ? "Default admin user created. CHANGE PASSWORD!\n"
-            : "Default users created (admin/supervisor). CHANGE PASSWORDS!\n";
+            ? "Admin user created with the initial password from VISITORPASS_ADMIN_INITIAL_PASSWORD.\n"
+            : "Default users created (admin/supervisor).\n";
+    }
+
+    if ($devSecrets !== []) {
+        $secretFile = '/tmp/visitantes-senhas-iniciais';
+        file_put_contents($secretFile, implode("\n", $devSecrets) . "\n", LOCK_EX);
+        chmod($secretFile, 0600);
+        echo "Senhas iniciais de desenvolvimento gravadas em {$secretFile} (0600, nao exibidas no log).\n";
     }
 
     echo "Migration completed successfully!\n";

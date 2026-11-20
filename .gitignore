@@ -28,7 +28,8 @@ node_modules/
 .psalm-cache/
 
 # Uploaded files
-! /fotos_visitantes/*
+/fotos_visitantes/*
+!/fotos_visitantes/.gitkeep
 
 # Config
 /config/database.local.php

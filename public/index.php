@@ -177,6 +177,45 @@ $time_left = verificarTimeout($isApi, $tempo_maximo);
 enforceUniqueSession($isApi);
 getCsrfToken();
 
+/**
+ * Usuario com senha temporaria so pode acessar a troca de senha (e logout,
+ * tratado antes do router). Bloqueia paginas e APIs ate a troca efetiva.
+ */
+function exigirTrocaSenha(string $page, bool $isApi): void
+{
+    if (!isset($_SESSION['usuario'])) {
+        return;
+    }
+
+    $paginasPermitidas = ['login', 'login_submit', 'trocar_senha', '404', 'nao_autorizado'];
+    if (in_array($page, $paginasPermitidas, true)) {
+        return;
+    }
+
+    if ((int) ($_SESSION['usuario']->senha_temporaria ?? 0) !== 1) {
+        return;
+    }
+
+    if ($isApi) {
+        http_response_code(403);
+        header('Content-Type: application/json; charset=UTF-8');
+        header('X-Content-Type-Options: nosniff');
+        header('Cache-Control: no-store');
+        echo json_encode([
+            'success' => false,
+            'status' => 'password_change_required',
+            'error' => 'Senha temporaria: troque a senha antes de usar a API.',
+            'redirect' => 'index.php?page=trocar_senha',
+        ], JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
+        exit;
+    }
+
+    header('Location: index.php?page=trocar_senha');
+    exit;
+}
+
+exigirTrocaSenha($page, $isApi);
+
 require_once __DIR__ . '/../config/config.php';
 
 $router = new Router();
