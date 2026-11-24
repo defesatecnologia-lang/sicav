@@ -12,12 +12,11 @@
 # e MYSQL_ROOT_PASSWORD. Sem elas o "docker compose" falha de proposito - o
 # fallback de senha fraca violava a politica de credenciais do projeto.
 #
-# Dados persistentes em drives separados, montados no servidor:
-#   - banco: RAID6 montado em /mnt/sstv-sigav
-#     DB_DATA_DIR - pasta do MySQL (default: /mnt/sstv-sigav/mysql)
-#   - fotos: montado em /mnt/sstv-dados
-#     FOTOS_DIR   - pasta de fotos (default: /mnt/sstv-dados/visitantes/fotos)
-# Ajuste via .env se necessario:
+# Todos os dados deste sistema ficam em /mnt/sstv-sicav, ponto de montagem do
+# RAID6. Ajuste via .env se necessario:
+#   DB_DATA_DIR - pasta do MySQL (default: /mnt/sstv-sicav/bd)
+#   FOTOS_DIR   - pasta de fotos (default: /mnt/sstv-sicav/fotos)
+#   BACKUP_DIR  - staging dos backups (default: /mnt/sstv-sicav/backup)
 #   NGINX_PORT  - porta externa do sistema (default: 8000)
 services:
   app:
@@ -44,9 +43,9 @@ services:
       VISITORPASS_ENV: ${APP_ENV:-production}
       VISITORPASS_APP_VERSION: ${VISITORPASS_APP_VERSION:-v1.0.0}
     volumes:
-      # Fotos dos visitantes no drive de dados.
-      # No host: chown 1000:1000 ${FOTOS_DIR:-/mnt/sstv-dados/visitantes/fotos}
-      - ${FOTOS_DIR:-/mnt/sstv-dados/visitantes/fotos}:/var/www/html/fotos_visitantes
+      # Fotos dos visitantes no mesmo drive do banco.
+      # No host: chown 1000:1000 ${FOTOS_DIR:-/mnt/sstv-sicav/fotos}
+      - ${FOTOS_DIR:-/mnt/sstv-sicav/fotos}:/var/www/html/fotos_visitantes
       - ./public/imagens:/var/www/html/public/imagens:ro
     depends_on:
       db:
@@ -142,9 +141,9 @@ services:
       MYSQL_USER: ${VISITORPASS_DB_USER:-vpuser}
       MYSQL_PASSWORD: ${VISITORPASS_DB_PASS:?defina VISITORPASS_DB_PASS no .env}
     volumes:
-      # Dados do MySQL no RAID6, em particao separada das fotos.
-      # No host: chown 999:999 ${DB_DATA_DIR:-/mnt/sstv-sigav/mysql}
-      - ${DB_DATA_DIR:-/mnt/sstv-sigav/mysql}:/var/lib/mysql
+      # Dados do MySQL no RAID6, em /mnt/sstv-sicav/bd.
+      # No host: chown 999:999 ${DB_DATA_DIR:-/mnt/sstv-sicav/bd}
+      - ${DB_DATA_DIR:-/mnt/sstv-sicav/bd}:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost -u root"]
       interval: 10s
@@ -162,9 +161,8 @@ services:
     mem_limit: 1g
     pids_limit: 512
 
-# Os dados persistentes usam bind mounts em drives distintos: o banco no RAID6
-# (/mnt/sstv-sigav), as fotos em /mnt/sstv-dados e os backups em /mnt/visitantes.
-# Nao ha volumes nomeados do Docker.
+# Os dados persistentes (banco, fotos e backups) usam bind mounts dentro de
+# /mnt/sstv-sicav, o ponto de montagem do RAID6. Nao ha volumes nomeados do Docker.
 
 networks:
   frontend:

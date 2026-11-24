@@ -4,11 +4,10 @@ Documentation=file:/opt/sistema-visitantes/README.md
 Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
-# Os drives de dados TEM que estar montados antes do Compose criar os bind
-# mounts: banco no RAID6 (/mnt/sstv-sigav) e fotos em /mnt/sstv-dados.
-RequiresMountsFor=/mnt/sstv-sigav /mnt/sstv-dados
-AssertPathIsMountPoint=/mnt/sstv-sigav
-AssertPathIsMountPoint=/mnt/sstv-dados
+# O RAID6 TEM que estar montado antes do Compose criar os bind mounts:
+# banco, fotos e backups ficam dentro de /mnt/sstv-sicav.
+RequiresMountsFor=/mnt/sstv-sicav
+AssertPathIsMountPoint=/mnt/sstv-sicav
 
 [Service]
 Type=oneshot
