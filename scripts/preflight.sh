@@ -107,6 +107,16 @@ else
     if [[ ! "$NGINX_PORT" =~ ^[0-9]+$ ]] || (( NGINX_PORT < 1 || NGINX_PORT > 65535 )); then
         fail "NGINX_PORT invalida: '$NGINX_PORT'."
     fi
+
+    # Assets estaticos: logos, icones e fundos vem do COPY do Dockerfile (estao
+    # dentro da imagem). Uma copia parcial do projeto no servidor — checkout,
+    # rsync ou git incompleto — ja deixou a interface sem imagens em producao.
+    # Confere os arquivos no checkout antes de buildar.
+    for f in public/imagens/favicon.ico public/imagens/Logo_sicav.png \
+             public/imagens/tela_fundo.png public/assets/css/main.css; do
+        [[ -s "$ROOT/$f" ]] || \
+            fail "arquivo estatico ausente no diretorio do projeto: $f — a copia do repositorio esta incompleta?"
+    done
 fi
 
 # ---------------------------------------------------------------------------
