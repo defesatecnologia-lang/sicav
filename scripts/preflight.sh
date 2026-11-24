@@ -3,8 +3,10 @@
 # Preflight de deploy do SICAV.
 #
 # Recusa configuracoes inseguras (ambiente de dev, senhas placeholder/fracas)
-# e garante que os diretorios de dados estao em um drive montado — sem isso o
+# e garante que os diretorios de dados estao em drives montados — sem isso o
 # Docker cria as pastas no disco raiz e os dados vao parar no lugar errado.
+# O banco (RAID6 em /mnt/sstv-sigav) e as fotos (/mnt/sstv-dados) devem estar
+# em pontos de montagem diferentes.
 #
 # Uso:
 #   ./scripts/preflight.sh            # modo producao (rigoroso)
@@ -109,7 +111,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Guarda do drive de dados
+# 2. Guarda dos drives de dados
 # ---------------------------------------------------------------------------
 check_data_dir() {
     local label="$1" dir="$2" expected_uid="$3" mountpoint owner
@@ -133,10 +135,23 @@ check_data_dir() {
 if [[ "$DEV_MODE" -eq 1 ]]; then
     echo "--> Guarda de mount: pulada (--dev)"
 else
-    echo "--> Verificando drive de dados..."
+    echo "--> Verificando drives de dados..."
     command -v findmnt >/dev/null || fail "findmnt (util-linux) nao encontrado."
-    check_data_dir "banco"  "${DB_DATA_DIR:-/mnt/visitantes/mysql}" 999
-    check_data_dir "fotos"  "${FOTOS_DIR:-/mnt/visitantes/fotos}" 1000
+
+    DB_DATA_DIR="${DB_DATA_DIR:-/mnt/sstv-sigav/mysql}"
+    FOTOS_DIR="${FOTOS_DIR:-/mnt/sstv-dados/visitantes/fotos}"
+    check_data_dir "banco"  "$DB_DATA_DIR" 999
+    check_data_dir "fotos"  "$FOTOS_DIR" 1000
+
+    db_mount="$(findmnt -T "$DB_DATA_DIR" -n -o TARGET 2>/dev/null || true)"
+    fotos_mount="$(findmnt -T "$FOTOS_DIR" -n -o TARGET 2>/dev/null || true)"
+    [[ "$db_mount" != "$fotos_mount" ]] || \
+        fail "Banco e fotos estao no mesmo ponto de montagem ($db_mount). O banco deve ficar no RAID6 separado (/mnt/sstv-sigav)."
+
+    db_dev="$(findmnt -T "$DB_DATA_DIR" -n -o SOURCE 2>/dev/null || true)"
+    fotos_dev="$(findmnt -T "$FOTOS_DIR" -n -o SOURCE 2>/dev/null || true)"
+    [[ "$db_dev" != "$fotos_dev" ]] || \
+        fail "Banco e fotos estao no mesmo dispositivo ($db_dev). O banco deve usar a particao RAID6 separada."
 fi
 
 # ---------------------------------------------------------------------------

@@ -78,7 +78,7 @@ fi
 DB_NAME="${VISITORPASS_DB_NAME:-visitorpass}"
 DB_USER="${VISITORPASS_DB_USER:-vpuser}"
 DB_PASS="${VISITORPASS_DB_PASS:-}"
-FOTOS_DIR="${FOTOS_DIR:-/mnt/visitantes/fotos}"
+FOTOS_DIR="${FOTOS_DIR:-/mnt/sstv-dados/visitantes/fotos}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-7}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 

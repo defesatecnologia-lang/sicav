@@ -87,9 +87,11 @@ navegador ──HTTP──▶ nginx ──▶ app (Apache + PHP 8.5) ──▶ d
   os pacotes do Oracle Linux; o serviço fica apenas na rede `backend` marcada
   `internal: true` — sem porta no host e sem saída para a internet. Acesso
   administrativo apenas via `docker compose exec db mysql -u root -p`.
-- **Dados persistentes**: bind mounts no drive dedicado `/mnt/visitantes`
-  (`mysql/` para o banco, `fotos/` para as fotos). Não há volumes nomeados
-  do Docker — backup é dump do banco + cópia dessas pastas.
+- **Dados persistentes**: bind mounts em drives separados — o banco no RAID6
+  montado em `/mnt/sstv-sigav/mysql`, as fotos em
+  `/mnt/sstv-dados/visitantes/fotos` e o staging dos backups em
+  `/mnt/visitantes/backups`. Não há volumes nomeados do Docker — backup é dump
+  do banco + cópia das fotos.
 - **Schema e migrações**: no boot do `app`, `docker/entrypoint.sh` executa
   `docker/migrate.php` (idempotente) — cria/atualiza o schema e, na primeira
   execução, os usuários padrão.
@@ -158,24 +160,31 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo systemctl enable --now docker
 ```
 
-#### 2. Montar o drive dedicado em /mnt/visitantes de forma persistente
+#### 2. Montar os drives de dados de forma persistente
 
-O banco de dados e as fotos ficam em um drive separado, montado em
-`/mnt/visitantes` via `/etc/fstab`, para continuar montado após reinicializações:
+O banco fica em uma partição RAID6, montada em `/mnt/sstv-sigav`; as fotos em
+`/mnt/sstv-dados`; o staging dos backups permanece em `/mnt/visitantes`. Os
+três são montados via `/etc/fstab` para continuar disponíveis após
+reinicializações:
 
 ```bash
-# Descubra o UUID do drive (ex.: /dev/sdb1)
-sudo blkid /dev/sdb1
+# Descubra os UUIDs (ex.: /dev/md0p1 = RAID6 do banco, /dev/sdb1 = dados, /dev/sdc1 = backups)
+sudo blkid /dev/md0p1 /dev/sdb1 /dev/sdc1
 
-# Crie o ponto de montagem e adicione a entrada no /etc/fstab:
-# UUID=<uuid-do-drive>  /mnt/visitantes  ext4  defaults,nofail  0  2
-sudo mkdir -p /mnt/visitantes
+# Crie os pontos de montagem e adicione as entradas no /etc/fstab:
+# UUID=<uuid-raid6>  /mnt/sstv-sigav  ext4  defaults,nofail  0  2
+# UUID=<uuid-dados>  /mnt/sstv-dados  ext4  defaults,nofail  0  2
+# UUID=<uuid-backup> /mnt/visitantes  ext4  defaults,nofail  0  2
+sudo mkdir -p /mnt/sstv-sigav /mnt/sstv-dados /mnt/visitantes
 sudo mount -a
-findmnt /mnt/visitantes   # confirme que está montado
+findmnt /mnt/sstv-sigav /mnt/sstv-dados /mnt/visitantes   # confirme os mounts
 ```
 
-A opção `nofail` evita que o servidor trave no boot caso o drive não esteja
-presente.
+O array RAID6 precisa estar montado antes do `mount -a` (por exemplo,
+`sudo mdadm --assemble --scan`; se o array fizer parte do boot, rode
+`sudo update-initramfs -u`). A opção `nofail` evita que o servidor trave no
+boot caso um drive não esteja presente — as unidades systemd e o preflight
+detectam a ausência do mount e impedem o deploy.
 
 #### 3. Implantar o sistema em /opt
 
@@ -184,11 +193,12 @@ presente.
 sudo mkdir -p /opt/sistema-visitantes
 # (copie o projeto para /opt/sistema-visitantes)
 
-# Crie as pastas de dados no drive dedicado (montado em /mnt/visitantes)
-sudo mkdir -p /mnt/visitantes/mysql /mnt/visitantes/fotos
+# Crie as pastas de dados nos drives montados (RAID6 para o banco)
+sudo mkdir -p /mnt/sstv-sigav/mysql /mnt/sstv-dados/visitantes/fotos
+sudo mkdir -p /mnt/visitantes/backups
 # MySQL 8.4 roda como UID 999 e o app como UID 1000:
-sudo chown 999:999 /mnt/visitantes/mysql
-sudo chown 1000:1000 /mnt/visitantes/fotos
+sudo chown 999:999 /mnt/sstv-sigav/mysql
+sudo chown 1000:1000 /mnt/sstv-dados/visitantes/fotos
 # Ubuntu usa AppArmor (não SELinux): os bind mounts funcionam sem os sufixos :z/:Z.
 
 # Crie o .env a partir do exemplo e proteja o arquivo (se ainda nao existir)
@@ -204,8 +214,8 @@ vim .env
 #   NGINX_PORT=8000
 # Prefixo de containers/redes (troque para cada sistema/instância):
 #   COMPOSE_PROJECT_NAME=visitantes
-# (Opcional: DB_DATA_DIR/FOTOS_DIR no .env mudam onde ficam os dados,
-#  se o drive dedicado estiver montado em outro ponto.)
+# DB_DATA_DIR/FOTOS_DIR no .env apontam para /mnt/sstv-sigav/mysql e
+# /mnt/sstv-dados/visitantes/fotos. Ajuste se os mounts tiverem outro ponto.
 
 # Preflight: recusa senha placeholder, APP_ENV != production e drive desmontado
 ./scripts/preflight.sh
@@ -214,14 +224,17 @@ vim .env
 ./scripts/deploy.sh
 ```
 
-Os dados persistentes (banco e fotos) ficam no drive dedicado em
-`/mnt/visitantes` (padrão do `docker-compose.yml`).
+Os dados persistentes ficam em drives separados: o banco em
+`/mnt/sstv-sigav/mysql` (RAID6), as fotos em
+`/mnt/sstv-dados/visitantes/fotos` e o staging dos backups em
+`/mnt/visitantes/backups` (padrões do `docker-compose.yml`/`.env`).
 
-> **Guarda de mount:** se o drive não estiver montado, o Docker cria
-> `/mnt/visitantes` como pasta comum no disco do sistema e os dados caem no
-> lugar errado. O `preflight.sh` aborta nesse caso. Para o boot automático,
-> instale as unidades versionadas — o `AssertPathIsMountPoint` falha o serviço
-> se o drive não estiver montado:
+> **Guarda de mount:** se um drive não estiver montado, o Docker cria a pasta
+> correspondente no disco do sistema e os dados caem no lugar errado. O
+> `preflight.sh` aborta se algum mount estiver ausente ou se banco e fotos
+> estiverem no mesmo ponto de montagem. Para o boot automático, instale as
+> unidades versionadas — o `AssertPathIsMountPoint` falha o serviço se
+> `/mnt/sstv-sigav`, `/mnt/sstv-dados` ou `/mnt/visitantes` não estiver montado:
 >
 > ```bash
 > sudo cp deploy/visitantes*.service deploy/visitantes-backup.timer /etc/systemd/system/
@@ -229,6 +242,28 @@ Os dados persistentes (banco e fotos) ficam no drive dedicado em
 > sudo systemctl enable --now visitantes.service visitantes-backup.timer
 > systemctl status visitantes.service visitantes-backup.timer
 > ```
+
+##### Migrando uma instalação existente
+
+Se a instalação já tem dados em `/mnt/visitantes/mysql` e
+`/mnt/visitantes/fotos`, mova-os com a stack parada (nunca copie arquivos do
+InnoDB com o MySQL em execução):
+
+```bash
+docker compose down
+sudo mkdir -p /mnt/sstv-sigav/mysql /mnt/sstv-dados/visitantes/fotos
+sudo chown 999:999 /mnt/sstv-sigav/mysql
+sudo chown 1000:1000 /mnt/sstv-dados/visitantes/fotos
+sudo rsync -aHAX --numeric-owner --sparse /mnt/visitantes/mysql/ /mnt/sstv-sigav/mysql/
+sudo rsync -aHAX --numeric-owner /mnt/visitantes/fotos/ /mnt/sstv-dados/visitantes/fotos/
+# Confira o .env: DB_DATA_DIR=/mnt/sstv-sigav/mysql e FOTOS_DIR=/mnt/sstv-dados/visitantes/fotos
+./scripts/preflight.sh
+./scripts/deploy.sh
+```
+
+Mantenha as cópias antigas até validar login, schemas, fotos e backup no novo
+local; só então remova-as. O `preflight.sh` também falha se `DB_DATA_DIR` e
+`FOTOS_DIR` apontarem para o mesmo ponto de montagem ou dispositivo.
 
 #### 4. Acesso e firewall
 
@@ -335,10 +370,10 @@ UPDATE usuarios SET ativo = 0 WHERE usuario IN ('admin', 'supervisor');
 
 ### Backup e restauração
 
-O banco fica em `/mnt/visitantes/mysql` e as fotos em
-`/mnt/visitantes/fotos` (drive dedicado). Guarde os backups **fora** desse
-drive (outro disco/servidor) — perder o drive não pode custar o banco **e** as
-fotos.
+O banco fica em `/mnt/sstv-sigav/mysql` (RAID6), as fotos em
+`/mnt/sstv-dados/visitantes/fotos` e o staging dos backups em
+`/mnt/visitantes/backups`. Guarde os backups **fora** desses drives (outro
+host/disco) — perder um drive não pode custar o banco **e** as fotos.
 
 `scripts/backup.sh` faz dump consistente (`--single-transaction`), empacota as
 fotos, gera `SHA256SUMS`, criptografa com GPG (há CPF/telefone/e-mail/fotos no
@@ -395,9 +430,9 @@ docker compose exec -T -e MYSQL_PWD="$MYSQL_ROOT_PASSWORD" db \
   mysql -u root "$VISITORPASS_DB_NAME" < /tmp/sicav-restore/db.sql
 
 # 5. Restaure as fotos para o drive dedicado (confira o destino antes!)
-sudo rm -rf /mnt/visitantes/fotos/*
-sudo tar -xzf /tmp/sicav-restore/fotos.tar.gz -C /mnt/visitantes/fotos
-sudo chown -R 1000:1000 /mnt/visitantes/fotos
+sudo rm -rf /mnt/sstv-dados/visitantes/fotos/*
+sudo tar -xzf /tmp/sicav-restore/fotos.tar.gz -C /mnt/sstv-dados/visitantes/fotos
+sudo chown -R 1000:1000 /mnt/sstv-dados/visitantes/fotos
 ```
 
 > Antes do go-live, **execute esse restore em um host de teste** e registre o
@@ -434,7 +469,8 @@ git pull --ff-only origin main
 ./scripts/release.sh
 ```
 
-Os dados no drive dedicado (`/mnt/visitantes`) não são tocados pelo rebuild.
+Os dados nos drives dedicados (`/mnt/sstv-sigav`, `/mnt/sstv-dados` e
+`/mnt/visitantes`) não são tocados pelo rebuild.
 O deploy é feito **somente a partir da `main`**. O fluxo completo de branches,
 PRs e versionamento está em [docs/FLUXO-GIT.md](docs/FLUXO-GIT.md).
 
@@ -442,9 +478,10 @@ PRs e versionamento está em [docs/FLUXO-GIT.md](docs/FLUXO-GIT.md).
 
 | Sintoma | Causa provável | Diagnóstico / correção |
 |---------|----------------|--------------------------|
-| Dados apareceram no disco do sistema em vez do drive dedicado | O drive não estava montado quando a stack subiu — o Docker criou `/mnt/visitantes` como pasta comum | `findmnt /mnt/visitantes`; `docker compose down`, mova os dados, monte o drive e suba novamente |
-| `db` nunca fica `healthy` | Permissões erradas na pasta do banco | `ls -ln /mnt/visitantes/mysql` → dono deve ser `999:999` (`sudo chown -R 999:999 /mnt/visitantes/mysql`) |
-| Upload de foto falha / erro de escrita | Permissões erradas na pasta de fotos | `ls -ln /mnt/visitantes/fotos` → dono deve ser `1000:1000` |
+| Dados apareceram no disco do sistema em vez do drive dedicado | Um dos drives não estava montado quando a stack subiu — o Docker criou a pasta como comum no disco raiz | `findmnt /mnt/sstv-sigav /mnt/sstv-dados /mnt/visitantes`; `docker compose down`, mova os dados, monte o drive e suba novamente |
+| `db` nunca fica `healthy` | Permissões erradas na pasta do banco | `ls -ln /mnt/sstv-sigav/mysql` → dono deve ser `999:999` (`sudo chown -R 999:999 /mnt/sstv-sigav/mysql`) |
+| Preflight falha com "mesmo ponto de montagem/dispositivo" | `DB_DATA_DIR` e `FOTOS_DIR` estão no mesmo filesystem | Confira `findmnt -T /mnt/sstv-sigav/mysql -o TARGET,SOURCE` e `findmnt -T /mnt/sstv-dados/visitantes/fotos -o TARGET,SOURCE`; monte os drives antes do deploy |
+| Upload de foto falha / erro de escrita | Permissões erradas na pasta de fotos | `ls -ln /mnt/sstv-dados/visitantes/fotos` → dono deve ser `1000:1000` |
 | `bind: address already in use` na subida | Outro serviço usando a porta | `sudo ss -ltnp \| grep 8000`; troque `NGINX_PORT` no `.env` |
 | nginx responde `502 Bad Gateway` | Container `app` parado ou reiniciando em loop | `docker compose ps`, `docker compose logs app` |
 | Login falha para usuário válido | Banco restaurado sem dados / schema ausente | `docker compose logs app` (procure `Migration completed`); confira com `docker compose exec db mysql -u root -p visitorpass` |
@@ -523,8 +560,8 @@ Variáveis lidas pelo `docker-compose.yml` a partir do `.env` (não commitado):
 | `VISITORPASS_DB_PASS` | — | **Obrigatória em produção**: senha da aplicação (sem fallback) |
 | `MYSQL_ROOT_PASSWORD` | — | **Obrigatória em produção**: senha root do MySQL |
 | `VISITORPASS_ADMIN_INITIAL_PASSWORD` | — | **Obrigatória no primeiro boot**: senha inicial do `admin`; nunca versionar |
-| `DB_DATA_DIR` | `/mnt/visitantes/mysql` | Pasta dos dados do MySQL (drive dedicado) |
-| `FOTOS_DIR` | `/mnt/visitantes/fotos` | Pasta das fotos dos visitantes (drive dedicado) |
+| `DB_DATA_DIR` | `/mnt/sstv-sigav/mysql` | Pasta dos dados do MySQL (RAID6 em partição separada) |
+| `FOTOS_DIR` | `/mnt/sstv-dados/visitantes/fotos` | Pasta das fotos dos visitantes (drive de dados) |
 | `VISITORPASS_SESSION_TIMEOUT` | `3600` | Timeout de inatividade da sessão (segundos) |
 | `VISITORPASS_SESSION_ABSOLUTE_LIFETIME` | `43200` | Vida máxima absoluta da sessão (segundos) |
 | `PMA_PORT` | `8081` | Porta do phpMyAdmin — **apenas no override de desenvolvimento** |
@@ -562,7 +599,7 @@ Os checks rodam no GitHub Actions a cada push em `main` e em
 | `tests.yml` — PHPUnit | Suíte PHP em PHP 8.4 e 8.5, além de `composer validate`, `composer audit` e `php -l` em todos os arquivos |
 | `tests.yml` — PHPStan | Análise estática nível 5 (`phpstan.neon`) |
 | `tests.yml` — Frontend | Sintaxe dos JS (Node 22) e smoke test HTML |
-| `ci.yml` — Compose | `docker compose config` de produção (dados em `/mnt/visitantes`) e do override de desenvolvimento |
+| `ci.yml` — Compose | `docker compose config` de produção (banco em `/mnt/sstv-sigav`, fotos em `/mnt/sstv-dados`, backups em `/mnt/visitantes`) e do override de desenvolvimento |
 | `ci.yml` — Lint | ShellCheck em `scripts/*.sh`/`docker/*.sh` e Hadolint no `Dockerfile` |
 | `ci.yml` — Cobertura | PHPUnit com PCOV e upload do `clover.xml` como artifact |
 | `ci.yml` — Smoke | Build e subida de `db + app + nginx` (dados em dirs temporários do runner), espera o banco ficar `healthy`, valida HTTP na porta 8000 e confere que o `X-Request-ID` do nginx aparece no evento de auditoria do PHP com o mesmo IP de cliente |
