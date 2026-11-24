@@ -155,7 +155,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      # Primeiro boot em /mnt/sstv-sicav (RAID6) leva ~70-120s para
+      # inicializar o datadir, e uma recovery apos parada abrupta pode levar
+      # mais. Start_period longo evita que o compose marque o db como unhealthy
+      # e aborta o stack por depends_on enquanto o mysqld ainda esta subindo.
+      # Um check que passa durante o start_period ja marca o servico healthy.
+      start_period: 180s
     restart: unless-stopped
     networks:
       - backend
