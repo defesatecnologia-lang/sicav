@@ -14,7 +14,7 @@
 #
 # Todos os dados deste sistema ficam em /mnt/sstv-sicav, ponto de montagem do
 # RAID6. Ajuste via .env se necessario:
-#   DB_DATA_DIR - pasta do MySQL (default: /mnt/sstv-sicav/bd)
+#   DB_DATA_DIR - pasta do MySQL (default: /mnt/sstv-sicav/banco)
 #   FOTOS_DIR   - pasta de fotos (default: /mnt/sstv-sicav/fotos)
 #   BACKUP_DIR  - staging dos backups (default: /mnt/sstv-sicav/backup)
 #   NGINX_PORT  - porta externa do sistema (default: 8000)
@@ -141,9 +141,9 @@ services:
       MYSQL_USER: ${VISITORPASS_DB_USER:-vpuser}
       MYSQL_PASSWORD: ${VISITORPASS_DB_PASS:?defina VISITORPASS_DB_PASS no .env}
     volumes:
-      # Dados do MySQL no RAID6, em /mnt/sstv-sicav/bd.
-      # No host: chown 999:999 ${DB_DATA_DIR:-/mnt/sstv-sicav/bd}
-      - ${DB_DATA_DIR:-/mnt/sstv-sicav/bd}:/var/lib/mysql
+      # Dados do MySQL no RAID6, em /mnt/sstv-sicav/banco.
+      # No host: chown 999:999 ${DB_DATA_DIR:-/mnt/sstv-sicav/banco}
+      - ${DB_DATA_DIR:-/mnt/sstv-sicav/banco}:/var/lib/mysql
     healthcheck:
       test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h localhost -u root"]
       interval: 10s

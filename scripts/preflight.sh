@@ -143,7 +143,7 @@ else
     [[ -n "$root_mount" && "$root_mount" != "/" ]] || \
         fail "$DATA_ROOT nao e um ponto de montagem. Monte o RAID6 antes do deploy — aborte se os dados cairem no disco raiz."
 
-    DB_DATA_DIR="${DB_DATA_DIR:-$DATA_ROOT/bd}"
+    DB_DATA_DIR="${DB_DATA_DIR:-$DATA_ROOT/banco}"
     FOTOS_DIR="${FOTOS_DIR:-$DATA_ROOT/fotos}"
     BACKUP_DIR="${BACKUP_DIR:-$DATA_ROOT/backup}"
     check_data_dir "banco"  "$DB_DATA_DIR" 999

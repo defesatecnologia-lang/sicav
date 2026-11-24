@@ -88,7 +88,7 @@ navegador ──HTTP──▶ nginx ──▶ app (Apache + PHP 8.5) ──▶ d
   `internal: true` — sem porta no host e sem saída para a internet. Acesso
   administrativo apenas via `docker compose exec db mysql -u root -p`.
 - **Dados persistentes**: tudo dentro de `/mnt/sstv-sicav` (ponto de montagem
-  do RAID6), com uma pasta por finalidade: `bd/` (MySQL), `fotos/` e `backup/`.
+  do RAID6), com uma pasta por finalidade: `banco/` (MySQL), `fotos/` e `backup/`.
   Não há volumes nomeados do Docker — backup é dump do banco + cópia das fotos.
 - **Schema e migrações**: no boot do `app`, `docker/entrypoint.sh` executa
   `docker/migrate.php` (idempotente) — cria/atualiza o schema e, na primeira
@@ -189,9 +189,9 @@ sudo mkdir -p /opt/sistema-visitantes
 # (copie o projeto para /opt/sistema-visitantes)
 
 # Crie as pastas de dados dentro do RAID6 (uma por finalidade)
-sudo mkdir -p /mnt/sstv-sicav/bd /mnt/sstv-sicav/fotos /mnt/sstv-sicav/backup
+sudo mkdir -p /mnt/sstv-sicav/banco /mnt/sstv-sicav/fotos /mnt/sstv-sicav/backup
 # MySQL 8.4 roda como UID 999 e o app como UID 1000:
-sudo chown 999:999 /mnt/sstv-sicav/bd
+sudo chown 999:999 /mnt/sstv-sicav/banco
 sudo chown 1000:1000 /mnt/sstv-sicav/fotos
 # Ubuntu usa AppArmor (não SELinux): os bind mounts funcionam sem os sufixos :z/:Z.
 
@@ -208,7 +208,7 @@ vim .env
 #   NGINX_PORT=8000
 # Prefixo de containers/redes (troque para cada sistema/instância):
 #   COMPOSE_PROJECT_NAME=visitantes
-# DB_DATA_DIR, FOTOS_DIR e BACKUP_DIR no .env apontam para bd/, fotos/ e
+# DB_DATA_DIR, FOTOS_DIR e BACKUP_DIR no .env apontam para banco/, fotos/ e
 # backup/ dentro de /mnt/sstv-sicav. Ajuste se o mount tiver outro ponto.
 
 # Preflight: recusa senha placeholder, APP_ENV != production e drive desmontado
@@ -219,13 +219,13 @@ vim .env
 ```
 
 Os dados persistentes ficam todos em `/mnt/sstv-sicav` (RAID6): banco em
-`bd/`, fotos em `fotos/` e staging dos backups em `backup/` (padrões do
+`banco/`, fotos em `fotos/` e staging dos backups em `backup/` (padrões do
 `docker-compose.yml`/`.env`).
 
 > **Guarda de mount:** se o RAID6 não estiver montado, o Docker cria
 > `/mnt/sstv-sicav` como pasta comum no disco do sistema e os dados caem no
 > lugar errado. O `preflight.sh` aborta se o mount estiver ausente ou se alguma
-> das pastas (`bd/`, `fotos/`, `backup/`) estiver fora dele. Para o boot
+> das pastas (`banco/`, `fotos/`, `backup/`) estiver fora dele. Para o boot
 > automático, instale as unidades versionadas — o `AssertPathIsMountPoint`
 > falha o serviço se `/mnt/sstv-sicav` não estiver montado:
 >
@@ -244,13 +244,13 @@ parada (nunca copie arquivos do InnoDB com o MySQL em execução):
 
 ```bash
 docker compose down
-sudo mkdir -p /mnt/sstv-sicav/bd /mnt/sstv-sicav/fotos /mnt/sstv-sicav/backup
-sudo chown 999:999 /mnt/sstv-sicav/bd
+sudo mkdir -p /mnt/sstv-sicav/banco /mnt/sstv-sicav/fotos /mnt/sstv-sicav/backup
+sudo chown 999:999 /mnt/sstv-sicav/banco
 sudo chown 1000:1000 /mnt/sstv-sicav/fotos
-sudo rsync -aHAX --numeric-owner --sparse /mnt/visitantes/mysql/ /mnt/sstv-sicav/bd/
+sudo rsync -aHAX --numeric-owner --sparse /mnt/visitantes/mysql/ /mnt/sstv-sicav/banco/
 sudo rsync -aHAX --numeric-owner /mnt/visitantes/fotos/ /mnt/sstv-sicav/fotos/
 [ -d /mnt/visitantes/backups ] && sudo rsync -aHAX --numeric-owner /mnt/visitantes/backups/ /mnt/sstv-sicav/backup/
-# Confira o .env: DB_DATA_DIR=/mnt/sstv-sicav/bd, FOTOS_DIR=/mnt/sstv-sicav/fotos
+# Confira o .env: DB_DATA_DIR=/mnt/sstv-sicav/banco, FOTOS_DIR=/mnt/sstv-sicav/fotos
 # e BACKUP_DIR=/mnt/sstv-sicav/backup
 ./scripts/preflight.sh
 ./scripts/deploy.sh
@@ -365,7 +365,7 @@ UPDATE usuarios SET ativo = 0 WHERE usuario IN ('admin', 'supervisor');
 
 ### Backup e restauração
 
-Banco (`bd/`), fotos (`fotos/`) e staging dos backups (`backup/`) ficam juntos
+Banco (`banco/`), fotos (`fotos/`) e staging dos backups (`backup/`) ficam juntos
 em `/mnt/sstv-sicav` (RAID6). A cópia de verdade vai para `BACKUP_REMOTE`, em
 outro host/disco — perder o RAID6 não pode custar o banco **e** as fotos.
 
@@ -472,8 +472,8 @@ PRs e versionamento está em [docs/FLUXO-GIT.md](docs/FLUXO-GIT.md).
 | Sintoma | Causa provável | Diagnóstico / correção |
 |---------|----------------|--------------------------|
 | Dados apareceram no disco do sistema em vez do RAID6 | O mount não estava ativo quando a stack subiu — o Docker criou `/mnt/sstv-sicav` como pasta comum no disco raiz | `findmnt /mnt/sstv-sicav`; `docker compose down`, mova os dados, monte o RAID6 e suba novamente |
-| `db` nunca fica `healthy` | Permissões erradas na pasta do banco | `ls -ln /mnt/sstv-sicav/bd` → dono deve ser `999:999` (`sudo chown -R 999:999 /mnt/sstv-sicav/bd`) |
-| Preflight falha com "fora do mount" | Alguma pasta (`bd/`, `fotos/`, `backup/`) está fora de `/mnt/sstv-sicav` | Confira `findmnt -T /mnt/sstv-sicav/bd -o TARGET,SOURCE` (e o mesmo para `fotos/` e `backup/`); monte o RAID6 antes do deploy |
+| `db` nunca fica `healthy` | Permissões erradas na pasta do banco | `ls -ln /mnt/sstv-sicav/banco` → dono deve ser `999:999` (`sudo chown -R 999:999 /mnt/sstv-sicav/banco`) |
+| Preflight falha com "fora do mount" | Alguma pasta (`banco/`, `fotos/`, `backup/`) está fora de `/mnt/sstv-sicav` | Confira `findmnt -T /mnt/sstv-sicav/banco -o TARGET,SOURCE` (e o mesmo para `fotos/` e `backup/`); monte o RAID6 antes do deploy |
 | Upload de foto falha / erro de escrita | Permissões erradas na pasta de fotos | `ls -ln /mnt/sstv-sicav/fotos` → dono deve ser `1000:1000` |
 | `bind: address already in use` na subida | Outro serviço usando a porta | `sudo ss -ltnp \| grep 8000`; troque `NGINX_PORT` no `.env` |
 | nginx responde `502 Bad Gateway` | Container `app` parado ou reiniciando em loop | `docker compose ps`, `docker compose logs app` |
@@ -553,7 +553,7 @@ Variáveis lidas pelo `docker-compose.yml` a partir do `.env` (não commitado):
 | `VISITORPASS_DB_PASS` | — | **Obrigatória em produção**: senha da aplicação (sem fallback) |
 | `MYSQL_ROOT_PASSWORD` | — | **Obrigatória em produção**: senha root do MySQL |
 | `VISITORPASS_ADMIN_INITIAL_PASSWORD` | — | **Obrigatória no primeiro boot**: senha inicial do `admin`; nunca versionar |
-| `DB_DATA_DIR` | `/mnt/sstv-sicav/bd` | Pasta dos dados do MySQL (dentro do RAID6) |
+| `DB_DATA_DIR` | `/mnt/sstv-sicav/banco` | Pasta dos dados do MySQL (dentro do RAID6) |
 | `FOTOS_DIR` | `/mnt/sstv-sicav/fotos` | Pasta das fotos dos visitantes (dentro do RAID6) |
 | `VISITORPASS_SESSION_TIMEOUT` | `3600` | Timeout de inatividade da sessão (segundos) |
 | `VISITORPASS_SESSION_ABSOLUTE_LIFETIME` | `43200` | Vida máxima absoluta da sessão (segundos) |
@@ -592,15 +592,33 @@ Os checks rodam no GitHub Actions a cada push em `main` e em
 | `tests.yml` — PHPUnit | Suíte PHP em PHP 8.4 e 8.5, além de `composer validate`, `composer audit` e `php -l` em todos os arquivos |
 | `tests.yml` — PHPStan | Análise estática nível 5 (`phpstan.neon`) |
 | `tests.yml` — Frontend | Sintaxe dos JS (Node 22) e smoke test HTML |
-| `ci.yml` — Compose | `docker compose config` de produção (tudo em `/mnt/sstv-sicav`: `bd/`, `fotos/`, `backup/`) e do override de desenvolvimento |
+| `ci.yml` — Compose | `docker compose config` de produção (tudo em `/mnt/sstv-sicav`: `banco/`, `fotos/`, `backup/`) e do override de desenvolvimento |
 | `ci.yml` — Lint | ShellCheck em `scripts/*.sh`/`docker/*.sh` e Hadolint no `Dockerfile` |
 | `ci.yml` — Cobertura | PHPUnit com PCOV e upload do `clover.xml` como artifact |
 | `ci.yml` — Smoke | Build e subida de `db + app + nginx` (dados em dirs temporários do runner), espera o banco ficar `healthy`, valida HTTP na porta 8000 e confere que o `X-Request-ID` do nginx aparece no evento de auditoria do PHP com o mesmo IP de cliente |
 | `ci.yml` — Scan (Trivy) | Scanner de vulnerabilidades nas imagens de produção (`app`, `nginx` e MySQL atualizado no build), falhando em `HIGH`/`CRITICAL` (`--ignore-unfixed`) |
 | `codeql.yml` | Code scanning: CodeQL para JavaScript/TypeScript e GitHub Actions; PHPStan (SARIF) e Psalm taint analysis (SARIF) para PHP — o CodeQL não oferece mais análise de PHP |
+| `tag.yml` | A cada merge em `main`, cria a próxima tag `vX.Y.Z` (`v1.0.0` na primeira): patch por padrão, `minor`/`major` quando o PR tem essa label |
 | `release.yml` | Cria a release no GitHub para cada tag `v*.*.*` |
 | `dependency-review.yml` | Revisão de dependências em PRs (falha em severidade `high`) |
 | Dependabot | PRs semanais para Composer, GitHub Actions, imagem Docker e Compose (majors do MySQL são ignorados para manter a linha LTS 8.4) |
+
+### Versionamento
+
+A versão do sistema é um tag semântico no Git. A primeira é `v1.0.0`; depois,
+cada correção mergeada em `main` gera automaticamente a próxima tag de patch
+(`v1.0.1`, `v1.0.2`, ...). Para uma mudança maior, adicione a label `minor` ou
+`major` ao PR **antes** do merge — o workflow `tag.yml` usa essa label para
+incrementar a versão. O `release.yml` publica a Release do GitHub com as notas
+geradas a partir dos commits.
+
+No servidor, para conferir/deployar uma versão específica após o merge:
+
+```bash
+git fetch --tags --force
+git describe --tags --abbrev=0        # mostra a versão mais recente
+git checkout v1.0.1                   # se precisar fixar uma versão anterior
+```
 
 Rodando os checks principais localmente (requer Docker e `composer install`):
 
