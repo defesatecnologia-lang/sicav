@@ -598,8 +598,8 @@ Os checks rodam no GitHub Actions a cada push em `main` e em
 | `ci.yml` — Smoke | Build e subida de `db + app + nginx` (dados em dirs temporários do runner), espera o banco ficar `healthy`, valida HTTP na porta 8000 e confere que o `X-Request-ID` do nginx aparece no evento de auditoria do PHP com o mesmo IP de cliente |
 | `ci.yml` — Scan (Trivy) | Scanner de vulnerabilidades nas imagens de produção (`app`, `nginx` e MySQL atualizado no build), falhando em `HIGH`/`CRITICAL` (`--ignore-unfixed`) |
 | `codeql.yml` | Code scanning: CodeQL para JavaScript/TypeScript e GitHub Actions; PHPStan (SARIF) e Psalm taint analysis (SARIF) para PHP — o CodeQL não oferece mais análise de PHP |
-| `tag.yml` | A cada merge em `main`, cria a próxima tag `vX.Y.Z` (`v1.0.0` na primeira): patch por padrão, `minor`/`major` quando o PR tem essa label |
-| `release.yml` | Cria a release no GitHub para cada tag `v*.*.*` |
+| `tag.yml` | A cada merge em `main`, cria a próxima tag `vX.Y.Z` (`v1.0.0` na primeira): patch por padrão, `minor`/`major` quando o PR tem essa label, e publica a Release no GitHub |
+| `release.yml` | Cria a release no GitHub para tags `v*.*.*` enviadas manualmente (tags criadas com `GITHUB_TOKEN` não disparam outros workflows) |
 | `dependency-review.yml` | Revisão de dependências em PRs (falha em severidade `high`) |
 | Dependabot | PRs semanais para Composer, GitHub Actions, imagem Docker e Compose (majors do MySQL são ignorados para manter a linha LTS 8.4) |
 
@@ -609,8 +609,8 @@ A versão do sistema é um tag semântico no Git. A primeira é `v1.0.0`; depois
 cada correção mergeada em `main` gera automaticamente a próxima tag de patch
 (`v1.0.1`, `v1.0.2`, ...). Para uma mudança maior, adicione a label `minor` ou
 `major` ao PR **antes** do merge — o workflow `tag.yml` usa essa label para
-incrementar a versão. O `release.yml` publica a Release do GitHub com as notas
-geradas a partir dos commits.
+incrementar a versão. O próprio `tag.yml` publica a Release do GitHub com as notas
+geradas a partir dos commits (o `release.yml` cobre tags enviadas manualmente).
 
 No servidor, para conferir/deployar uma versão específica após o merge:
 
