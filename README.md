@@ -67,13 +67,13 @@ crachás, relatórios e auditoria.
 
 ```
 navegador ──HTTP──▶ nginx ──▶ app (Apache + PHP 8.5) ──▶ db (MySQL 8.4)
-                     :8000     rede frontend (interna)   rede backend
+                     :3000     rede frontend (interna)   rede backend
                      única porta                           (internal: true)
                      publicada
 ```
 
 - **nginx** (`nginx:stable-alpine`, fixado por digest): reverse proxy e
-  **única porta publicada** no host (`NGINX_PORT`, padrão 8000). Config em
+  **única porta publicada** no host (`NGINX_PORT`, padrão 3000). Config em
   `deploy/nginx/default.conf`. Gera um `X-Request-ID` por requisição e o
   encaminha ao app; o log de acesso começa com esse ID.
 - **app** (imagem construída do `Dockerfile`): Apache + PHP 8.5, roda como
@@ -109,7 +109,7 @@ docker compose up -d
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 # Acesse:
-# - App (via nginx): http://localhost:8000
+# - App (via nginx): http://localhost:3000
 # - phpMyAdmin (apenas via override de dev): http://localhost:8081
 ```
 
@@ -205,7 +205,7 @@ vim .env
 # A senha inicial do admin tambem pode ser gerada com:
 #   printf 'VISITORPASS_ADMIN_INITIAL_PASSWORD=Vp1!%s\n' "$(openssl rand -hex 12)" >> .env
 # Porta externa do sistema (troque se houver mais de um sistema no servidor):
-#   NGINX_PORT=8000
+#   NGINX_PORT=3000
 # Prefixo de containers/redes (troque para cada sistema/instância):
 #   COMPOSE_PROJECT_NAME=visitantes
 # DB_DATA_DIR, FOTOS_DIR e BACKUP_DIR no .env apontam para banco/, fotos/ e
@@ -266,15 +266,15 @@ O nginx roda como container do serviço `nginx` e é a única porta publicada no
 host. Ele encaminha para o container `app` pela rede interna `frontend`:
 
 ```bash
-# Libera a porta externa no firewall do host (padrão 8000)
-sudo ufw allow 8000/tcp
+# Libera a porta externa no firewall do host (padrão 3000)
+sudo ufw allow 3000/tcp
 sudo ufw enable    # se o firewall ainda não estiver ativo
 
 # Confira os containers
 docker compose ps
 ```
 
-Acesse em `http://10.10.10.208:8000`.
+Acesse em `http://10.10.10.208:3000`.
 
 > **HTTP sem TLS:** a stack serve HTTP puro, adequado para rede interna
 > isolada. Cookies de sessão só recebem a flag `Secure` quando o acesso é
@@ -303,7 +303,7 @@ Acesse em `http://10.10.10.208:8000`.
 docker compose ps
 
 # O app deve responder com redirect para o login (302)
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/
 
 # Migração concluída no primeiro boot (procure no log do app)
 docker compose logs app | grep -i migration
@@ -438,7 +438,7 @@ sudo chown -R 1000:1000 /mnt/sstv-sicav/fotos
 - [ ] `scripts/deploy.sh` conclui com "migracao OK"; uma falha de `migrate.php` aborta o deploy.
 - [ ] `BACKUP_REMOTE` e `BACKUP_GPG_RECIPIENT` configurados; `scripts/preflight.sh` aprovado.
 - [ ] Restore completo executado em host de teste, com RTO/RPO medidos e registrados.
-- [ ] Porta `8000` liberada no firewall **apenas para a subnet interna** (ex.: `ufw allow from 10.10.10.0/24 to any port 8000 proto tcp`).
+- [ ] Porta `3000` liberada no firewall **apenas para a subnet interna** (ex.: `ufw allow from 10.10.10.0/24 to any port 3000 proto tcp`).
 - [ ] Aceite formal do risco TLS (rede interna isolada) registrado; se a rede for compartilhada, terminar TLS antes do go-live.
 - [ ] Branch `main` protegida no GitHub (PR obrigatória, ≥1 aprovação e status checks).
 
@@ -475,7 +475,7 @@ PRs e versionamento está em [docs/FLUXO-GIT.md](docs/FLUXO-GIT.md).
 | `db` nunca fica `healthy` | Permissões erradas na pasta do banco | `ls -ln /mnt/sstv-sicav/banco` → dono deve ser `999:999` (`sudo chown -R 999:999 /mnt/sstv-sicav/banco`) |
 | Preflight falha com "fora do mount" | Alguma pasta (`banco/`, `fotos/`, `backup/`) está fora de `/mnt/sstv-sicav` | Confira `findmnt -T /mnt/sstv-sicav/banco -o TARGET,SOURCE` (e o mesmo para `fotos/` e `backup/`); monte o RAID6 antes do deploy |
 | Upload de foto falha / erro de escrita | Permissões erradas na pasta de fotos | `ls -ln /mnt/sstv-sicav/fotos` → dono deve ser `1000:1000` |
-| `bind: address already in use` na subida | Outro serviço usando a porta | `sudo ss -ltnp \| grep 8000`; troque `NGINX_PORT` no `.env` |
+| `bind: address already in use` na subida | Outro serviço usando a porta | `sudo ss -ltnp \| grep 3000`; troque `NGINX_PORT` no `.env` |
 | nginx responde `502 Bad Gateway` | Container `app` parado ou reiniciando em loop | `docker compose ps`, `docker compose logs app` |
 | Login falha para usuário válido | Banco restaurado sem dados / schema ausente | `docker compose logs app` (procure `Migration completed`); confira com `docker compose exec db mysql -u root -p visitorpass` |
 | Rate limiting bloqueia todo mundo / auditoria sempre com o mesmo IP | O `mod_remoteip` não carregou a conf (tmpfs ausente no `app`) | `docker compose exec app cat /etc/visitantes/remoteip/remoteip.conf`; se o arquivo não existir, confira o `tmpfs` do serviço `app` no compose e o `IncludeOptional` em `docker/apache.conf` |
@@ -545,7 +545,7 @@ Variáveis lidas pelo `docker-compose.yml` a partir do `.env` (não commitado):
 
 | Variável | Default | Descrição |
 |----------|---------|-----------|
-| `NGINX_PORT` | `8000` | Porta externa (única) publicada no host |
+| `NGINX_PORT` | `3000` | Porta externa (única) publicada no host |
 | `APP_ENV` | `production` | `production` = instala apenas dependências de produção e remove `.env`, `node_modules` e arquivos `.md` da imagem; `development` = instala dependências de dev e executa PHPUnit + checagem de sintaxe JS durante o build |
 | `COMPOSE_PROJECT_NAME` | nome da pasta | Prefixo de containers/redes — use valores distintos para cada sistema no mesmo servidor |
 | `VISITORPASS_DB_NAME` | `visitorpass` | Nome do banco |
@@ -595,7 +595,7 @@ Os checks rodam no GitHub Actions a cada push em `main` e em
 | `ci.yml` — Compose | `docker compose config` de produção (tudo em `/mnt/sstv-sicav`: `banco/`, `fotos/`, `backup/`) e do override de desenvolvimento |
 | `ci.yml` — Lint | ShellCheck em `scripts/*.sh`/`docker/*.sh` e Hadolint no `Dockerfile` |
 | `ci.yml` — Cobertura | PHPUnit com PCOV e upload do `clover.xml` como artifact |
-| `ci.yml` — Smoke | Build e subida de `db + app + nginx` (dados em dirs temporários do runner), espera o banco ficar `healthy`, valida HTTP na porta 8000 e confere que o `X-Request-ID` do nginx aparece no evento de auditoria do PHP com o mesmo IP de cliente |
+| `ci.yml` — Smoke | Build e subida de `db + app + nginx` (dados em dirs temporários do runner), espera o banco ficar `healthy`, valida HTTP na porta 3000 e confere que o `X-Request-ID` do nginx aparece no evento de auditoria do PHP com o mesmo IP de cliente |
 | `ci.yml` — Scan (Trivy) | Scanner de vulnerabilidades nas imagens de produção (`app`, `nginx` e MySQL atualizado no build), falhando em `HIGH`/`CRITICAL` (`--ignore-unfixed`) |
 | `codeql.yml` | Code scanning: CodeQL para JavaScript/TypeScript e GitHub Actions; PHPStan (SARIF) e Psalm taint analysis (SARIF) para PHP — o CodeQL não oferece mais análise de PHP |
 | `tag.yml` | A cada merge em `main`, cria a próxima tag `vX.Y.Z` (`v1.0.0` na primeira): patch por padrão, `minor`/`major` quando o PR tem essa label, e publica a Release no GitHub |

@@ -4,7 +4,7 @@
 #   cd /opt/sistema-visitantes && docker compose up -d --build
 #
 # Acesso externo: container "nginx" (reverse proxy) na porta NGINX_PORT
-# (padrao 8000). Em producao: http://10.10.10.208:8000 (rede interna local).
+# (padrao 3000). Em producao: http://10.10.10.208:3000 (rede interna local).
 # Config em deploy/nginx/default.conf. O container "app" nao publica portas no
 # host; e acessado apenas pela rede interna.
 #
@@ -17,7 +17,7 @@
 #   DB_DATA_DIR - pasta do MySQL (default: /mnt/sstv-sicav/banco)
 #   FOTOS_DIR   - pasta de fotos (default: /mnt/sstv-sicav/fotos)
 #   BACKUP_DIR  - staging dos backups (default: /mnt/sstv-sicav/backup)
-#   NGINX_PORT  - porta externa do sistema (default: 8000)
+#   NGINX_PORT  - porta externa do sistema (default: 3000)
 services:
   app:
     build:
@@ -95,8 +95,8 @@ services:
       dockerfile: docker/nginx.Dockerfile
     image: sicav-nginx:local
     ports:
-      # Unica porta publicada no host (producao: http://10.10.10.208:8000)
-      - "${NGINX_PORT:-8000}:80"
+      # Unica porta publicada no host (producao: http://10.10.10.208:3000)
+      - "${NGINX_PORT:-3000}:80"
     volumes:
       - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:

@@ -113,7 +113,7 @@ if ! echo "$USERS" | grep -q admin; then
 fi
 
 NGINX_PORT=$(grep -E '^NGINX_PORT=' .env | cut -d= -f2 || true)
-NGINX_PORT=${NGINX_PORT:-8000}
+NGINX_PORT=${NGINX_PORT:-3000}
 
 APP_ENV=$(grep -E '^APP_ENV=' .env | cut -d= -f2 || true)
 APP_ENV=${APP_ENV:-production}

@@ -103,7 +103,7 @@ else
     done
     echo "    Backup remoto: ${BACKUP_REMOTE} (restore de teste obrigatorio antes do go-live)"
 
-    NGINX_PORT="${NGINX_PORT:-8000}"
+    NGINX_PORT="${NGINX_PORT:-3000}"
     if [[ ! "$NGINX_PORT" =~ ^[0-9]+$ ]] || (( NGINX_PORT < 1 || NGINX_PORT > 65535 )); then
         fail "NGINX_PORT invalida: '$NGINX_PORT'."
     fi
