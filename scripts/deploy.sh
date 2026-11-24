@@ -13,6 +13,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# O .env da raiz e a configuracao real de producao (senhas, porta, caminhos).
+# Este script NUNCA copia .env.example.docker/.env.example para .env: isso
+# sobrescreveria a configuracao ja feita no servidor. O preflight tambem exige
+# um .env legivel; a checagem explicita aqui da a mensagem antes de qualquer
+# build/subida.
+ENV_FILE="${SICAV_ENV_FILE:-$ROOT/.env}"
+if [[ ! -r "$ENV_FILE" ]]; then
+    echo "ERRO: arquivo de ambiente nao encontrado/legivel: $ENV_FILE" >&2
+    echo "      O deploy nao copia .env.example: use o .env ja configurado na raiz do projeto." >&2
+    exit 1
+fi
+echo "--> Usando configuracao existente: $ENV_FILE (nao sera copiada nem alterada)"
+
 echo "--> Preflight..."
 "$ROOT/scripts/preflight.sh" "${1:-}"
 
