@@ -5,7 +5,7 @@
 # Trivy acusa a versao antiga mesmo com o digest mais recente da tag.
 #
 # Para atualizar o digest: ./scripts/pin-images.sh --apply
-ARG NGINX_IMAGE=nginx:stable-alpine@sha256:3bc3836dc0be3b811f238210360bf8e7ca8a2d0effdae46160bf1f3578710051
+ARG NGINX_IMAGE=nginx:stable-alpine@sha256:8eb2b5540eae779603cc3db84b3986a15ecb5308b54303146eee9837c137b51a
 
 FROM ${NGINX_IMAGE}
 
