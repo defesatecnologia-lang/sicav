@@ -47,6 +47,22 @@ COPY docker/php.ini /usr/local/etc/php/conf.d/custom.ini
 
 COPY . /var/www/html/
 
+# Imagens e icones estaticos (logos, favicons, fundos de tela) sao essenciais:
+# sem eles a interface aparece quebrada. O COPY acima ja os inclui; este teste
+# falha o build na hora se algum arquivo sumir (ex.: por entrada errada no
+# .dockerignore), em vez de quebrar somente no servidor.
+RUN set -eux; \
+    for f in \
+        public/imagens/favicon.ico \
+        public/imagens/Logo_sicav.png \
+        public/imagens/tela_fundo.png \
+        public/imagens/site.webmanifest \
+        public/assets/css/main.css \
+        public/assets/js/main.js; do \
+        test -s "/var/www/html/$f" || { echo "asset estatico ausente no build: $f" >&2; exit 1; }; \
+    done; \
+    echo "assets estaticos conferidos na imagem"
+
 COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
 RUN set -eux; \

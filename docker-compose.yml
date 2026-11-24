@@ -46,7 +46,13 @@ services:
       # Fotos dos visitantes no mesmo drive do banco.
       # No host: chown 1000:1000 ${FOTOS_DIR:-/mnt/sstv-sicav/fotos}
       - ${FOTOS_DIR:-/mnt/sstv-sicav/fotos}:/var/www/html/fotos_visitantes
-      - ./public/imagens:/var/www/html/public/imagens:ro
+      # public/imagens (logos, favicons, fundos de tela) NAO leva bind mount:
+      # esses arquivos vem do COPY do Dockerfile, dentro da imagem. Um mount
+      # aqui sobrescreve o conteudo da imagem pelo do host e, se a pasta no
+      # host estiver vazia ou ausente, o Docker cria um diretorio vazio e as
+      # imagens/icones desaparecem da interface (404). Para trocar uma imagem,
+      # atualize o arquivo no repositorio e refaca o deploy (deploy.sh ja
+      # usa --build).
     depends_on:
       db:
         condition: service_healthy
