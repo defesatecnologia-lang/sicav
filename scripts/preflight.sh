@@ -3,8 +3,9 @@
 # Preflight de deploy do SICAV.
 #
 # Recusa configuracoes inseguras (ambiente de dev, senhas placeholder/fracas)
-# e garante que os diretorios de dados estao em um drive montado — sem isso o
-# Docker cria as pastas no disco raiz e os dados vao parar no lugar errado.
+# e garante que todos os dados estao em /mnt/sstv-sicav, ponto de montagem do
+# RAID6 — sem isso o Docker cria as pastas no disco raiz e os dados vao parar
+# no lugar errado.
 #
 # Uso:
 #   ./scripts/preflight.sh            # modo producao (rigoroso)
@@ -109,17 +110,19 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Guarda do drive de dados
+# 2. Guarda do drive de dados (/mnt/sstv-sicav)
 # ---------------------------------------------------------------------------
+DATA_ROOT="/mnt/sstv-sicav"
+
 check_data_dir() {
     local label="$1" dir="$2" expected_uid="$3" mountpoint owner
 
-    [[ -d "$dir" ]] || fail "$label ($dir) nao existe. Monte o drive antes de subir a stack; nao crie a pasta manualmente no disco raiz."
+    [[ -d "$dir" ]] || fail "$label ($dir) nao existe. Monte o RAID6 antes de subir a stack; nao crie a pasta manualmente no disco raiz."
 
     mountpoint="$(findmnt -T "$dir" -n -o TARGET 2>/dev/null || true)"
     [[ -n "$mountpoint" ]] || fail "Nao foi possivel determinar o ponto de montagem de $dir."
     [[ "$mountpoint" != "/" ]] || \
-        fail "$label ($dir) esta no filesystem raiz (montado em '/'). O drive dedicado nao foi montado — aborte o deploy."
+        fail "$label ($dir) esta no filesystem raiz (montado em '/'). O RAID6 nao foi montado — aborte o deploy."
 
     owner="$(stat -c '%u:%g' "$dir" 2>/dev/null || echo '?')"
     if [[ "$owner" != "$expected_uid:$expected_uid" ]]; then
@@ -135,8 +138,24 @@ if [[ "$DEV_MODE" -eq 1 ]]; then
 else
     echo "--> Verificando drive de dados..."
     command -v findmnt >/dev/null || fail "findmnt (util-linux) nao encontrado."
-    check_data_dir "banco"  "${DB_DATA_DIR:-/mnt/visitantes/mysql}" 999
-    check_data_dir "fotos"  "${FOTOS_DIR:-/mnt/visitantes/fotos}" 1000
+
+    root_mount="$(findmnt -T "$DATA_ROOT" -n -o TARGET 2>/dev/null || true)"
+    [[ -n "$root_mount" && "$root_mount" != "/" ]] || \
+        fail "$DATA_ROOT nao e um ponto de montagem. Monte o RAID6 antes do deploy — aborte se os dados cairem no disco raiz."
+
+    DB_DATA_DIR="${DB_DATA_DIR:-$DATA_ROOT/bd}"
+    FOTOS_DIR="${FOTOS_DIR:-$DATA_ROOT/fotos}"
+    BACKUP_DIR="${BACKUP_DIR:-$DATA_ROOT/backup}"
+    check_data_dir "banco"  "$DB_DATA_DIR" 999
+    check_data_dir "fotos"  "$FOTOS_DIR" 1000
+
+    for dir in "$DB_DATA_DIR" "$FOTOS_DIR" "$BACKUP_DIR"; do
+        [[ -d "$dir" ]] || fail "Pasta de dados nao existe: $dir. Crie-a dentro de $DATA_ROOT antes do deploy."
+        dir_mount="$(findmnt -T "$dir" -n -o TARGET 2>/dev/null || true)"
+        [[ "$dir_mount" == "$root_mount" ]] || \
+            fail "$dir nao esta em $DATA_ROOT (mount: ${dir_mount:-indefinido}). Todos os dados devem ficar no mesmo RAID6."
+    done
+    echo "    Todos os dados em $root_mount"
 fi
 
 # ---------------------------------------------------------------------------

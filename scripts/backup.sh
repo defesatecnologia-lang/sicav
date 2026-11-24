@@ -12,7 +12,7 @@
 #   ./scripts/backup.sh --output /tmp/bk --no-encrypt   # teste local
 #
 # Variaveis (via .env ou ambiente):
-#   BACKUP_DIR            destino local (default: /mnt/visitantes/backups)
+#   BACKUP_DIR            staging local (default: /mnt/sstv-sicav/backup)
 #   BACKUP_GPG_RECIPIENT  destinatario GPG (email ou fingerprint) — obrigatorio
 #   BACKUP_REMOTE         destino rsync remoto (ex.: backup@host:/srv/sicav)
 #   BACKUP_KEEP_DAYS      dias de retencao local (default: 7)
@@ -35,7 +35,7 @@ warn() { echo "AVISO: $*" >&2; }
 
 ENCRYPT=1
 OUTPUT_GIVEN=0
-BACKUP_DIR="${BACKUP_DIR:-/mnt/visitantes/backups}"
+BACKUP_DIR="${BACKUP_DIR:-/mnt/sstv-sicav/backup}"
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -78,7 +78,7 @@ fi
 DB_NAME="${VISITORPASS_DB_NAME:-visitorpass}"
 DB_USER="${VISITORPASS_DB_USER:-vpuser}"
 DB_PASS="${VISITORPASS_DB_PASS:-}"
-FOTOS_DIR="${FOTOS_DIR:-/mnt/visitantes/fotos}"
+FOTOS_DIR="${FOTOS_DIR:-/mnt/sstv-sicav/fotos}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-7}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
 

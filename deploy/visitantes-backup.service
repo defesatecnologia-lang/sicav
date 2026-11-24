@@ -1,8 +1,8 @@
 [Unit]
 Description=SICAV - backup diario (banco + fotos)
 Documentation=file:/opt/sistema-visitantes/README.md
-RequiresMountsFor=/mnt/visitantes
-AssertPathIsMountPoint=/mnt/visitantes
+RequiresMountsFor=/mnt/sstv-sicav
+AssertPathIsMountPoint=/mnt/sstv-sicav
 After=visitantes.service
 
 [Service]
