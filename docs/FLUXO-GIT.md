@@ -78,7 +78,7 @@ docker compose up -d --build
 
 # 4. Verifique a aplicação
 docker compose ps
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/
 ```
 
 ## Versionamento e tags
