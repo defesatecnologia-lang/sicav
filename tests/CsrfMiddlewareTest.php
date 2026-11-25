@@ -14,6 +14,7 @@ class CsrfMiddlewareTest extends TestCase
     protected function tearDown(): void
     {
         unset($_SESSION['csrf_token'], $_SERVER['HTTP_X_CSRF_TOKEN'], $_POST['csrf_token']);
+        unset($_GET['page']);
         $_SERVER['REQUEST_METHOD'] = 'GET';
     }
 
@@ -44,6 +45,16 @@ class CsrfMiddlewareTest extends TestCase
 
         $result = $middleware->handle(fn() => 'passed');
         $this->assertSame('passed', $result);
+    }
+
+    public function testLoginSubmitHandlesItsOwnCsrfValidation(): void
+    {
+        $_SERVER['REQUEST_METHOD'] = 'POST';
+        $_GET['page'] = 'login_submit';
+        $middleware = new CsrfMiddleware();
+
+        $result = $middleware->handle(fn() => 'handled by login route');
+        $this->assertSame('handled by login route', $result);
     }
 
     public function testDeniesPostWithInvalidToken(): void
